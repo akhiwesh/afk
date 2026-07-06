@@ -1,0 +1,22 @@
+id: AFK-QUE-0005
+type: questionnaire_item
+name: Average monthly revenue (₹)
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Revenue Audit question 'monthly_revenue' (extracted verbatim from M2).
+text: Average monthly revenue (₹)
+answer_type: number
+options: null
+engine_field: monthly_revenue
+section: revenue
+evidence_class: self_report
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

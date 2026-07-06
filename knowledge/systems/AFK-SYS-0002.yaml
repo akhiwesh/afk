@@ -1,0 +1,24 @@
+id: AFK-SYS-0002
+type: business_system
+name: Lead Qualification
+version: 1.0.0
+status: hypothesis
+owner: chief_ontologist
+description: 'Business system: Lead Qualification (extracted from M2 constraint engine dimension ''qualification'').'
+definition: The Lead Qualification subsystem of a revenue engine.
+purpose: Direct selling time toward leads that can and will buy.
+audit_fields:
+- qualification_process
+- pct_leads_worth_it
+todos:
+- 'TODO(research): inputs/outputs/processes not yet specified by accepted research.'
+- 'TODO(research): healthy-principles section pending Business Physiology extraction.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

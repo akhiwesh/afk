@@ -1,0 +1,36 @@
+id: AFK-DET-0007
+type: detection_rule
+name: Low close rate on serious leads
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Conversion System v2 — close rate below 30% on serious leads.
+constraint_id: AFK-CON-0003
+logic: conversion_close_rate < 30
+penalty: 22
+threshold_basis: operator_judgment
+evidence_map:
+  required:
+  - kind: questionnaire
+    fields:
+    - conversion_close_rate
+  missing_behavior: rule does not fire; field appears in missing-evidence guidance
+relationships:
+- type: detects
+  target: AFK-CON-0003
+  confidence: hypothesized
+todos:
+- 'TODO(validation): threshold has operator_judgment basis only; requires calibration against case studies.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 2.0.0
+  date: '2026-07-07'
+  by: Conversion System v2
+  reason: Updated threshold and field for Conversion System v2
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

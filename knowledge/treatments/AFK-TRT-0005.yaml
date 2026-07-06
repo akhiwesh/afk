@@ -1,0 +1,33 @@
+id: AFK-TRT-0005
+type: treatment
+name: 'First-line treatment: Retention & Repeat Revenue'
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Recommended next step for the Retention & Repeat Revenue constraint (extracted verbatim from
+  M2 playbook).
+definition: 'Call five customers who stopped buying and ask one question: ''what changed?'' Do not sell
+  on the call. Their answers are the retention strategy.'
+mechanism: Earned customers do not return, forcing growth spend to refill a leaking bucket.
+treats:
+- AFK-CON-0005
+expected_outcome:
+  uplift_heuristic_fraction_of_annual_revenue: 0.18
+  basis: operator_judgment heuristic; displayed to users as a directional estimate with formula
+relationships:
+- type: treats
+  target: AFK-CON-0005
+  confidence: hypothesized
+todos:
+- 'TODO(research): contraindications not yet specified by accepted research — do not assume none exist.'
+- 'TODO(research): expected_timeframe, failure_criteria, monitoring pending Treatment Methodology.'
+- 'TODO(validation): uplift fraction is a heuristic; zero outcome observations exist.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

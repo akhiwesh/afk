@@ -1,0 +1,33 @@
+id: AFK-TRT-0001
+type: treatment
+name: 'First-line treatment: Demand Generation'
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Recommended next step for the Demand Generation constraint (extracted verbatim from M2 playbook).
+definition: 'Before spending on ads: pick ONE additional lead source that matches how your customers already
+  buy, and commit to it for 30 days. Volume is the cap right now — nothing downstream can compensate.'
+mechanism: Insufficient or fragile lead flow caps every downstream stage; no downstream improvement can
+  exceed top-of-funnel volume.
+treats:
+- AFK-CON-0001
+expected_outcome:
+  uplift_heuristic_fraction_of_annual_revenue: 0.15
+  basis: operator_judgment heuristic; displayed to users as a directional estimate with formula
+relationships:
+- type: treats
+  target: AFK-CON-0001
+  confidence: hypothesized
+todos:
+- 'TODO(research): contraindications not yet specified by accepted research — do not assume none exist.'
+- 'TODO(research): expected_timeframe, failure_criteria, monitoring pending Treatment Methodology.'
+- 'TODO(validation): uplift fraction is a heuristic; zero outcome observations exist.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

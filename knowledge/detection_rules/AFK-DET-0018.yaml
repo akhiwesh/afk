@@ -1,0 +1,32 @@
+id: AFK-DET-0018
+type: detection_rule
+name: Founder in every sale
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Deterministic detection rule for AFK-CON-0006 (threshold extracted verbatim from M2 engine).
+constraint_id: AFK-CON-0006
+logic: founder_in_every_sale == 'Yes, every deal'
+penalty: 25
+threshold_basis: operator_judgment
+evidence_map:
+  required:
+  - kind: questionnaire
+    fields:
+    - founder_in_every_sale
+  missing_behavior: rule does not fire; field appears in missing-evidence guidance
+relationships:
+- type: detects
+  target: AFK-CON-0006
+  confidence: hypothesized
+todos:
+- 'TODO(validation): threshold has operator_judgment basis only; requires calibration against case studies.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

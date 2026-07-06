@@ -1,0 +1,28 @@
+id: AFK-QUE-0011
+type: questionnaire_item
+name: Primary lead source
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Revenue Audit question 'primary_lead_source' (extracted verbatim from M2).
+text: Primary lead source
+answer_type: select
+options:
+- Referrals / word of mouth
+- Outbound (calls, DMs, email)
+- Inbound content / SEO
+- Paid ads
+- Partnerships / channel
+- Walk-in / location
+engine_field: primary_lead_source
+section: demand
+evidence_class: self_report
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

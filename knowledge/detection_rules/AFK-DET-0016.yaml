@@ -1,0 +1,32 @@
+id: AFK-DET-0016
+type: detection_rule
+name: Churn reasons unknown
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Deterministic detection rule for AFK-CON-0005 (threshold extracted verbatim from M2 engine).
+constraint_id: AFK-CON-0005
+logic: churn_reason_known == 'No'
+penalty: 20
+threshold_basis: operator_judgment
+evidence_map:
+  required:
+  - kind: questionnaire
+    fields:
+    - churn_reason_known
+  missing_behavior: rule does not fire; field appears in missing-evidence guidance
+relationships:
+- type: detects
+  target: AFK-CON-0005
+  confidence: hypothesized
+todos:
+- 'TODO(validation): threshold has operator_judgment basis only; requires calibration against case studies.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

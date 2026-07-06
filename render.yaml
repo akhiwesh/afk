@@ -1,0 +1,18 @@
+# One-click deploy config for Render.com (free tier works for testing).
+# Connect the repo/folder to Render; it reads this file automatically.
+services:
+  - type: web
+    name: afk-platform
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: AFK_ENV
+        value: production
+      - key: AFK_SECRET_KEY
+        generateValue: true       # Render generates a strong secret automatically
+      - key: AFK_CORS_ORIGINS
+        value: "*PLACEHOLDER*"    # after first deploy, set to your https://afk-xxxx.onrender.com URL
+      - key: PYTHON_VERSION
+        value: "3.12"

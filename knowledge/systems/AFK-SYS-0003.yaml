@@ -1,0 +1,31 @@
+id: AFK-SYS-0003
+type: business_system
+name: Sales Conversion & Follow-up
+version: 1.0.0
+status: hypothesis
+owner: chief_ontologist
+description: 'Business system: Sales Conversion & Follow-up (Conversion System v2).'
+definition: The Sales Conversion & Follow-up subsystem of a revenue engine.
+purpose: Turn qualified interest into paid revenue.
+audit_fields:
+- conversion_close_rate
+- conversion_followups
+- conversion_owner
+- conversion_process
+- conversion_cycle_days
+todos:
+- 'TODO(research): inputs/outputs/processes not yet specified by accepted research.'
+- 'TODO(research): healthy-principles section pending Business Physiology extraction.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 2.0.0
+  date: '2026-07-07'
+  by: Conversion System v2
+  reason: Five-question conversion audit with v2 scoring bands
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

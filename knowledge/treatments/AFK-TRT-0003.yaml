@@ -1,0 +1,35 @@
+id: AFK-TRT-0003
+type: treatment
+name: 'First-line treatment: Sales Conversion & Follow-up'
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Recommended next step for the Sales Conversion & Follow-up constraint (extracted verbatim
+  from M2 playbook).
+definition: 'Install a dead-simple follow-up system this week: every open lead gets a next-touch date,
+  and no lead is closed-lost before 5 touches. This is the highest-leverage fix because the leads are
+  already paid for.'
+mechanism: Interest fails to become revenue through weak follow-up discipline or an underperforming sales
+  conversation.
+treats:
+- AFK-CON-0003
+expected_outcome:
+  uplift_heuristic_fraction_of_annual_revenue: 0.2
+  basis: operator_judgment heuristic; displayed to users as a directional estimate with formula
+relationships:
+- type: treats
+  target: AFK-CON-0003
+  confidence: hypothesized
+todos:
+- 'TODO(research): contraindications not yet specified by accepted research — do not assume none exist.'
+- 'TODO(research): expected_timeframe, failure_criteria, monitoring pending Treatment Methodology.'
+- 'TODO(validation): uplift fraction is a heuristic; zero outcome observations exist.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
