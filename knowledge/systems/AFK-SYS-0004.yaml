@@ -1,0 +1,25 @@
+id: AFK-SYS-0004
+type: business_system
+name: Pricing & Monetization
+version: 1.0.0
+status: hypothesis
+owner: chief_ontologist
+description: 'Business system: Pricing & Monetization (extracted from M2 constraint engine dimension ''pricing'').'
+definition: The Pricing & Monetization subsystem of a revenue engine.
+purpose: Capture fair value for what is delivered.
+audit_fields:
+- pricing_confidence
+- last_price_change
+- discounting
+todos:
+- 'TODO(research): inputs/outputs/processes not yet specified by accepted research.'
+- 'TODO(research): healthy-principles section pending Business Physiology extraction.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

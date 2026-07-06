@@ -1,0 +1,32 @@
+id: AFK-DET-0023
+type: detection_rule
+name: Long sales cycle
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Conversion System v2 — average days from serious contact to payment exceeds 90.
+constraint_id: AFK-CON-0003
+logic: conversion_cycle_days > 90
+penalty: 10
+threshold_basis: operator_judgment
+evidence_map:
+  required:
+  - kind: questionnaire
+    fields:
+    - conversion_cycle_days
+  missing_behavior: rule does not fire; field appears in missing-evidence guidance
+relationships:
+- type: detects
+  target: AFK-CON-0003
+  confidence: hypothesized
+todos:
+- 'TODO(validation): threshold has operator_judgment basis only; requires calibration against case studies.'
+created:
+  by: Conversion System v2
+  date: '2026-07-07'
+  reason: Added with Conversion System v2 redesign
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: Conversion System v2
+  reason: Added with Conversion System v2 redesign

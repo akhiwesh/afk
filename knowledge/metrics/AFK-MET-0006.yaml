@@ -1,0 +1,24 @@
+id: AFK-MET-0006
+type: metric
+name: Highest-volume lead source
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Computed metric 'top_lead_source' (extracted verbatim from M3.2 evidence_intel).
+definition: Highest-volume lead source
+unit: categorical
+computation: mode(lead.source)
+direction: contextual
+evidence_fields_required:
+- leads.source
+todos:
+- 'TODO(research): healthy_range and danger_range require benchmark data (M4) — not invented here.'
+created:
+  by: Founding CTO (extraction script)
+  date: '2026-07-04'
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'
+changelog:
+- version: 1.0.0
+  date: '2026-07-04'
+  by: Founding CTO (extraction script)
+  reason: 'M3.3a: faithful extraction of knowledge previously hard-coded in Python'

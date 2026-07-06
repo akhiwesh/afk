@@ -1,0 +1,22 @@
+id: AFK-QUE-0029
+type: questionnaire_item
+name: What is the average number of days from first serious contact to payment?
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Conversion System v2 — average sales cycle in days.
+text: What is the average number of days from first serious contact to payment?
+answer_type: number
+options: null
+engine_field: conversion_cycle_days
+section: conversion
+evidence_class: self_report
+created:
+  by: Conversion System v2
+  date: '2026-07-07'
+  reason: Fifth conversion question — days from serious contact to payment
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: Conversion System v2
+  reason: Added with Conversion System v2 redesign
