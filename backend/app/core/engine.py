@@ -370,11 +370,21 @@ def build_system_finding(dim_key: str, answers: dict) -> dict:
         impact = _impact_with_revenue(answers, dim_key, _qualitative_impact(dim_key))
         expected = _expected_outcome(dim_key)
 
+    from backend.app.core import evidence_intel as evi  # lazy: avoids circular import
+
+    epi = _epistemic_for_dimension(dim_key, answers)
+    conf_pct = int(epi * 100)
+    conf_basis = (
+        f"{conf_pct}% epistemic confidence (AFK-CFM-0001) — self-report caps at "
+        f"{int(evi.QUESTIONNAIRE_CEILING * 100)}% until measured evidence confirms."
+    )
+
     formatted = (
         f"Finding:\n{finding}\n\n"
         f"Root Cause:\n{root_cause}\n\n"
         f"Business Impact:\n{impact}\n\n"
         f"Score: {score}/100 ({status})\n\n"
+        f"Confidence: {conf_pct}% — {conf_basis}\n\n"
         f"Recommended Action:\n{play['next_step']}\n\n"
         f"Expected Outcome:\n{expected}"
     )
@@ -386,6 +396,9 @@ def build_system_finding(dim_key: str, answers: dict) -> dict:
         "score": score,
         "status": status,
         "score_line": f"Score: {score}/100 ({status})",
+        "confidence": epi,
+        "confidence_pct": conf_pct,
+        "confidence_basis": conf_basis,
         "recommended_action": play["next_step"],
         "expected_outcome": expected,
         "formatted": formatted,
@@ -525,6 +538,135 @@ def _rules_founder(a: dict) -> list[dict]:
     return out
 
 
+def _epistemic_for_dimension(
+    dim_key: str,
+    answers: dict,
+    kinds_present: dict[str, int] | None = None,
+    quality_by_kind: dict[str, float] | None = None,
+) -> float:
+    """Per-dimension epistemic confidence per AFK-CFM-0001."""
+    from backend.app.core import evidence_intel as evi  # lazy: avoids circular import
+
+    breakdown = evi.evidence_confidence(
+        answers,
+        kinds_present or {},
+        quality_by_kind or {},
+    )
+    return breakdown["per_dimension"].get(dim_key, 0.0)
+
+
+def _apply_epistemic_confidence(
+    dims_out: list[dict],
+    answers: dict,
+    kinds_present: dict[str, int] | None = None,
+    quality_by_kind: dict[str, float] | None = None,
+) -> dict:
+    """Replace misleading coverage-as-confidence with CFM-0001 epistemic values."""
+    from backend.app.core import evidence_intel as evi  # lazy: avoids circular import
+
+    breakdown = evi.evidence_confidence(
+        answers,
+        kinds_present or {},
+        quality_by_kind or {},
+    )
+    for d in dims_out:
+        d["confidence"] = breakdown["per_dimension"].get(d["key"], 0.0)
+    return breakdown
+
+
+def _funnel_coherence_check(answers: dict) -> dict | None:
+    """Deterministic funnel arithmetic — flags belief/evidence incoherence (TOC-style)."""
+    leads = _num(answers, "leads_per_month")
+    worth = _num(answers, "pct_leads_worth_it")
+    close = _num(answers, "conversion_close_rate")
+    deal = _num(answers, "avg_deal_value")
+    stated = _num(answers, "monthly_revenue")
+    if None in (leads, worth, close, deal, stated) or stated <= 0:
+        return None
+
+    serious = leads * (worth / 100.0)
+    new_payers = serious * (close / 100.0)
+    theoretical = new_payers * deal
+    ratio = theoretical / stated
+
+    if 0.55 <= ratio <= 1.6:
+        return None
+
+    if ratio < 0.55:
+        explanation = (
+            f"Stated revenue (₹{int(stated):,}/mo) is much higher than a first-order funnel estimate "
+            f"(₹{int(theoretical):,}/mo from leads × worth-it% × close% × deal size). "
+            "Repeat revenue, upsells, or misstated funnel numbers may explain the gap — but the stated story does not close arithmetically."
+        )
+    else:
+        explanation = (
+            f"Funnel arithmetic (₹{int(theoretical):,}/mo) exceeds stated revenue (₹{int(stated):,}/mo). "
+            "Either revenue is under-reported or funnel inputs are overstated."
+        )
+
+    return {
+        "theoretical_monthly_revenue": round(theoretical),
+        "stated_monthly_revenue": round(stated),
+        "ratio": round(ratio, 2),
+        "verdict": "incoherent",
+        "explanation": explanation,
+        "basis": (
+            f"{int(leads)} leads × {int(worth)}% worth-it × {int(close)}% close × "
+            f"₹{int(deal):,} deal ≈ ₹{int(theoretical):,}/mo vs stated ₹{int(stated):,}/mo."
+        ),
+    }
+
+
+_HYPOTHESIS_SIGNALS = {
+    "demand": ("lead", "pipeline", "marketing", "enquir", "inbound", "outbound", "referral"),
+    "qualification": ("qualif", "wrong lead", "wrong-fit", "calendar"),
+    "conversion": ("close", "follow", "sales", "convert", "win rate"),
+    "pricing": ("price", "pricing", "margin", "discount", "underpric"),
+    "retention": ("churn", "retention", "repeat", "renew", "leak"),
+    "founder_dependency": ("founder", "my time", "delegat", "team", "hire"),
+}
+
+
+def _hypothesis_verdict(answers: dict, primary_key: str) -> dict | None:
+    """Cross-examine founder self-diagnosis against measured primary constraint."""
+    text = (answers.get("self_diagnosis") or "").lower().strip()
+    if not text or not primary_key:
+        return None
+
+    def _signals(dim: str) -> bool:
+        return any(s in text for s in _HYPOTHESIS_SIGNALS.get(dim, ()))
+
+    believed = next((k for k in _HYPOTHESIS_SIGNALS if _signals(k)), None)
+    if not believed:
+        return {
+            "founder_hypothesis": answers.get("self_diagnosis"),
+            "inferred_belief_system": None,
+            "measured_primary": primary_key,
+            "verdict": "unclear",
+            "explanation": "Could not map your hypothesis to a revenue system — compare it manually to the measured primary constraint.",
+        }
+
+    if believed == primary_key:
+        return {
+            "founder_hypothesis": answers.get("self_diagnosis"),
+            "inferred_belief_system": believed,
+            "measured_primary": primary_key,
+            "verdict": "aligned",
+            "explanation": f"Your hypothesis aligns with the measured primary constraint ({DIMENSIONS[primary_key]['label']}).",
+        }
+
+    return {
+        "founder_hypothesis": answers.get("self_diagnosis"),
+        "inferred_belief_system": believed,
+        "measured_primary": primary_key,
+        "verdict": "contradicted",
+        "explanation": (
+            f"You pointed to {DIMENSIONS[believed]['label'].lower()}, but evidence ranks "
+            f"{DIMENSIONS[primary_key]['label'].lower()} as the stronger constraint right now."
+        ),
+    }
+
+
 def _compound_findings(answers: dict, dims: list[dict]) -> list[dict]:
     """Cross-system interactions (Phase 1)."""
     by_key = {d["key"]: d for d in dims if d.get("score") is not None}
@@ -610,7 +752,8 @@ def compute_twin(answers: dict) -> dict:
     strengths = [
         {"dimension": d["label"], "score": d["score"]}
         for d in diagnosis.get("dimensions", [])
-        if d.get("score") is not None and d["score"] >= 80 and d["confidence"] >= 0.5
+        if d.get("score") is not None and d["score"] >= 80
+        and _dimension_scorable(d.get("coverage", 0))
     ]
 
     return {
@@ -637,7 +780,11 @@ def compute_twin(answers: dict) -> dict:
     }
 
 
-def compute_health(answers: dict) -> dict:
+def compute_health(
+    answers: dict,
+    evidence_kinds: dict[str, int] | None = None,
+    evidence_quality: dict[str, float] | None = None,
+) -> dict:
     """Full diagnosis. Returns either sufficient=False with what's missing,
     or the health score + per-dimension findings, all evidence-cited."""
     dims_out = []
@@ -645,19 +792,20 @@ def compute_health(answers: dict) -> dict:
     weighted_score = 0.0
 
     for key, meta in DIMENSIONS.items():
-        conf = _dimension_confidence(answers, key)
+        coverage = _dimension_confidence(answers, key)
         missing = [_QLABEL[f] for f in meta["fields"] if answers.get(f) in (None, "")]
-        findings = _RULES[key](answers) if conf > 0 else []
+        findings = _RULES[key](answers) if coverage > 0 else []
         score = None
-        if _dimension_scorable(conf):
+        if _dimension_scorable(coverage):
             score = max(0, 100 - sum(f["penalty"] for f in findings))
-            weighted_score += score * conf
-            total_conf_weight += conf
+            weighted_score += score * coverage
+            total_conf_weight += coverage
         dims_out.append({
             "key": key,
             "label": meta["label"],
             "score": score,
-            "confidence": conf,
+            "coverage": coverage,
+            "confidence": coverage,  # replaced with epistemic below
             "findings": findings,
             "missing": missing,
         })
@@ -671,13 +819,16 @@ def compute_health(answers: dict) -> dict:
             "completeness": completeness,
             "message": "Not enough evidence to diagnose. Complete more of the Revenue Audit — the engine will not guess.",
             "dimensions": dims_out,
-            "missing_summary": [d["label"] for d in dims_out if not _dimension_scorable(d["confidence"])],
+            "missing_summary": [d["label"] for d in dims_out if not _dimension_scorable(d["coverage"])],
         }
 
+    epi_breakdown = _apply_epistemic_confidence(
+        dims_out, answers, evidence_kinds, evidence_quality,
+    )
     health = round(weighted_score / total_conf_weight)
     scored = [d for d in dims_out if d["score"] is not None]
     primary = min(scored, key=lambda d: d["score"])
-    overall_conf = round(total_conf_weight / len(DIMENSIONS), 2)
+    overall_conf = epi_breakdown["overall"]
 
     weakest = min(d["score"] for d in scored) if scored else health
     if weakest <= _CHAIN_CAP_CRITICAL:
@@ -728,12 +879,16 @@ def compute_health(answers: dict) -> dict:
         "revenue_opportunity": opportunity,
         "recommended_next_step": play["next_step"] if play else None,
         "dimensions": sorted(dims_out, key=lambda d: (d["score"] is None, d["score"] if d["score"] is not None else 0)),
-        "missing_summary": [d["label"] for d in dims_out if not _dimension_scorable(d["confidence"])],
+        "missing_summary": [d["label"] for d in dims_out if not _dimension_scorable(d["coverage"])],
         "compound_findings": compound,
         "weakest_system_score": weakest,
+        "funnel_coherence": _funnel_coherence_check(answers),
+        "hypothesis_verdict": _hypothesis_verdict(answers, primary["key"]),
+        "epistemic_confidence": epi_breakdown,
         "method_note": ("Scores are rule-based and deterministic. Every dimension starts at 100; each finding "
                         "subtracts a stated penalty, and every finding cites the answers it is based on. "
                         "A system scores only when 100% of its evidence fields are answered. "
+                        "Epistemic confidence follows AFK-CFM-0001 (questionnaire caps at 40%). "
                         "Overall health is capped when any system is Critical (<55)."),
     }
 
@@ -916,7 +1071,10 @@ def compute_recommendation(answers: dict) -> Optional[dict]:
         "why": top["reasoning"] if top else "This dimension scored lowest among all measured dimensions.",
         "evidence": [e for f in pc["findings"] for e in f["evidence"]],
         "confidence_pct": int(pc["confidence"] * 100),
-        "confidence_basis": f"Based on {int(pc['confidence'] * 100)}% audit coverage of {pc['label']} and deterministic scoring rules.",
+        "confidence_basis": (
+            f"Based on {int(pc['confidence'] * 100)}% epistemic confidence (AFK-CFM-0001) for "
+            f"{pc['label']} and deterministic scoring rules."
+        ),
         "assumptions": ("Assumes stated audit answers are accurate, and that the uplift heuristic "
                         f"({int(play.get('uplift', 0) * 100)}% of annual revenue) transfers to this business — "
                         "unvalidated until tested."),

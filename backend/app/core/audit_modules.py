@@ -216,14 +216,16 @@ def compute_module_payoff(module_id: str, answers: dict) -> dict:
         return payoff
 
     score = dim.get("score")
-    conf = dim.get("confidence", 0)
-    status = _status_label(score, conf, module_id)
+    coverage = dim.get("coverage", dim.get("confidence", 0))
+    epi_conf = dim.get("confidence", 0)
+    status = _status_label(score, coverage, module_id)
 
     payoff["dimension"] = {
         "key": dim["key"],
         "label": dim["label"],
         "score": score,
-        "confidence": conf,
+        "coverage": coverage,
+        "confidence": epi_conf,
     }
     payoff["findings"] = dim.get("findings", [])
     payoff["missing_fields"] = dim.get("missing", [])
@@ -250,7 +252,7 @@ def compute_module_payoff(module_id: str, answers: dict) -> dict:
 
     if module.get("evidence_hint"):
         payoff["confidence_note"] = (
-            f"Confidence for this system: {int(conf * 100)}% from your answers alone. "
+            f"Epistemic confidence for this system: {int(epi_conf * 100)}% (AFK-CFM-0001). "
             f"{module['evidence_hint']}"
         )
 

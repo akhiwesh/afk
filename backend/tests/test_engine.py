@@ -1,6 +1,7 @@
 """Constraint Engine V1 — the engine must never guess, and every
 conclusion must carry evidence, reasoning, and confidence."""
 from backend.app.core import engine as ce
+from backend.app.core import evidence_intel as evi
 
 
 FULL_ANSWERS = {
@@ -87,7 +88,7 @@ def test_partial_dimension_gets_no_score():
         partial.pop(k)
     h = ce.compute_health(partial)
     conv = next(d for d in h["dimensions"] if d["key"] == "conversion")
-    assert not ce._dimension_scorable(conv["confidence"])
+    assert not ce._dimension_scorable(conv["coverage"])
     assert conv["score"] is None
     assert conv["missing"]
 
@@ -215,3 +216,26 @@ def test_phase1_chain_cap_and_compound_findings():
     assert h["weakest_system_score"] < 55
     assert h["health_score"] <= 55
     assert isinstance(h.get("compound_findings"), list)
+
+
+def test_epistemic_confidence_capped_without_uploaded_evidence():
+    h = ce.compute_health(FULL_ANSWERS)
+    assert h["confidence"] <= evi.QUESTIONNAIRE_CEILING + 0.05
+    for d in h["dimensions"]:
+        if d.get("coverage", 0) >= 1.0 and d["key"] != "founder_dependency":
+            assert d["confidence"] <= evi.QUESTIONNAIRE_CEILING + 0.01
+
+
+def test_funnel_coherence_flags_arithmetic_gap():
+    h = ce.compute_health(FULL_ANSWERS)
+    fc = h.get("funnel_coherence")
+    assert fc and fc["verdict"] == "incoherent"
+    assert fc["stated_monthly_revenue"] > fc["theoretical_monthly_revenue"]
+
+
+def test_hypothesis_verdict_contradicts_wrong_belief():
+    h = ce.compute_health(FULL_ANSWERS)
+    hv = h.get("hypothesis_verdict")
+    assert hv["verdict"] == "contradicted"
+    assert hv["inferred_belief_system"] == "demand"
+    assert h["primary_constraint"]["key"] != "demand"
