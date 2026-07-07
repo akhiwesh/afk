@@ -10,9 +10,15 @@ import { renderHealth } from "./pages/health.js";
 import { renderAudit } from "./pages/audit.js";
 import { renderEvidence } from "./pages/evidence.js";
 import { renderTwin } from "./pages/twin.js";
-import { renderAnalyst } from "./pages/analyst.js";
-import { renderCRM } from "./pages/crm.js";
 import { renderAdmin } from "./pages/admin.js";
+
+/** Revenue product nav — audit → evidence → diagnosis → twin. Legacy routes redirect. */
+const REVENUE_NAV = [
+  { id: "audit", hash: "#audit", label: "Revenue Audit", icon: "content" },
+  { id: "evidence", hash: "#evidence", label: "Evidence", icon: "billing" },
+  { id: "diagnosis", hash: "#diagnosis", label: "Diagnosis", icon: "home" },
+  { id: "twin", hash: "#twin", label: "Business Twin", icon: "briefcase" },
+];
 
 // Unified Application shell mounting logic
 class App {
@@ -41,11 +47,12 @@ class App {
     AppRouter.addRoute("#audit", (param) => this.renderPrivateView(renderAudit, "audit"), true);
     AppRouter.addRoute("#evidence", (param) => this.renderPrivateView(renderEvidence, "evidence"), true);
     AppRouter.addRoute("#twin", (param) => this.renderPrivateView(renderTwin, "twin"), true);
-    AppRouter.addRoute("#analyst", (param) => this.renderPrivateView(renderAnalyst, "analyst"), true);
-    AppRouter.addRoute("#data", (param) => this.renderPrivateView(renderCRM, "data"), true);
     AppRouter.addRoute("#admin", (param) => this.renderPrivateView(renderAdmin, "admin"), true);
-    // Legacy route redirect
-    AppRouter.addRoute("#dashboard", (param) => { window.location.hash = "#health"; }, true);
+    // Legacy / parked routes → revenue surface
+    AppRouter.addRoute("#dashboard", () => { window.location.hash = "#diagnosis"; }, true);
+    AppRouter.addRoute("#analyst", () => { window.location.hash = "#diagnosis"; }, true);
+    AppRouter.addRoute("#data", () => { window.location.hash = "#evidence"; }, true);
+    AppRouter.addRoute("#crm", () => { window.location.hash = "#evidence"; }, true);
   }
 
   renderPublicView(renderFn) {
@@ -65,36 +72,27 @@ class App {
           <!-- Navigation Sidebar -->
           <aside class="sidebar">
             <div class="sidebar-logo">
-              <span style="background:linear-gradient(135deg, hsl(var(--primary)), #a855f7); width:26px; height:26px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:0.85rem; margin-right:4px;">A</span>
-              AFK · Revenue Clarity
+              <span class="sidebar-logo-mark">A</span>
+              <span>AFK · Revenue Clarity</span>
             </div>
 
-            <div id="onboarding-checklist" class="onboarding-checklist" style="padding:0 1rem 1rem;font-size:0.78rem;"></div>
-            
+            <div id="onboarding-checklist" class="onboarding-checklist"></div>
+
+            <p class="sidebar-section-label">Revenue diagnostic</p>
             <nav class="sidebar-menu">
-              <a href="#health" class="sidebar-item" id="menu-health">
-                ${UI.icon('home')} Diagnosis
-              </a>
-              <a href="#audit" class="sidebar-item" id="menu-audit">
-                ${UI.icon('content')} Revenue Audit
-              </a>
-              <a href="#evidence" class="sidebar-item" id="menu-evidence">
-                ${UI.icon('billing')} Evidence
-              </a>
-              <a href="#twin" class="sidebar-item" id="menu-twin">
-                ${UI.icon('briefcase')} Business Twin
-              </a>
-              <a href="#data" class="sidebar-item" id="menu-data">
-                ${UI.icon('users')} Revenue Data
-              </a>
-              <a href="#analyst" class="sidebar-item" id="menu-analyst">
-                ${UI.icon('ai')} Analyst
-              </a>
-              ${user && user.role === 'admin' 
-                ? `<a href="#admin" class="sidebar-item" id="menu-admin">${UI.icon('settings')} Settings</a>`
-                : ""
-              }
+              ${REVENUE_NAV.map((item) => `
+                <a href="${item.hash}" class="sidebar-item" id="menu-${item.id}">
+                  ${UI.icon(item.icon)} ${item.label}
+                </a>`).join("")}
             </nav>
+
+            ${user && user.role === "admin" ? `
+              <p class="sidebar-section-label sidebar-section-label--spaced">Admin</p>
+              <nav class="sidebar-menu sidebar-menu--compact">
+                <a href="#admin" class="sidebar-item" id="menu-admin">
+                  ${UI.icon("settings")} Settings
+                </a>
+              </nav>` : ""}
 
             <div class="sidebar-footer">
               <div class="user-profile">
@@ -177,11 +175,11 @@ class App {
         return;
       }
       host.innerHTML = `
-        <div style="font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.5rem;">Your clarity path</div>
+        <p class="sidebar-section-label">Your clarity path</p>
         ${steps.map((s) => `
-          <a href="${s.href}" style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;color:hsl(var(--text-secondary));text-decoration:none;">
-            <span style="color:${s.done ? 'hsl(var(--success))' : 'hsl(var(--text-muted))'};">${s.done ? '✓' : '○'}</span>
-            <span>${s.label}${s.id === 'audit' && !s.done ? ` (${s.progress}/${s.total})` : ''}${s.id === 'evidence' && s.progress ? ` (${s.progress})` : ''}</span>
+          <a href="${s.href}" class="onboarding-step ${s.done ? "is-done" : ""}">
+            <span class="onboarding-step-icon">${s.done ? "✓" : "○"}</span>
+            <span>${s.label}${s.id === "audit" && !s.done ? ` (${s.progress}/${s.total})` : ""}${s.id === "evidence" && s.progress ? ` (${s.progress})` : ""}</span>
           </a>`).join("")}
       `;
     } catch {

@@ -35,7 +35,7 @@ export class Router {
     if (!route) {
       // Fallback
       if (API.isAuthenticated()) {
-        window.location.hash = "#dashboard";
+        window.location.hash = "#diagnosis";
       } else {
         window.location.hash = "#";
       }
