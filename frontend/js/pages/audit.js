@@ -1,296 +1,316 @@
 import { API } from "../api.js";
 import { UI } from "../ui.js";
+import { renderGauge, ruleIdChip, scoreStatus } from "../diagnostic-ui.js";
 
-async function runAnalysisSequence(container) {
-  const steps = [
-    "Analyzing your business…",
-    "Building your Business Twin",
-    "Understanding your revenue model",
-    "Analyzing the customer journey",
-    "Detecting constraints",
-    "Calculating Revenue Health",
-  ];
-  container.innerHTML = `
-    <div style="max-width:560px;margin:0 auto;padding-top:18vh;">
-      <div id="seq" style="display:flex;flex-direction:column;gap:1rem;"></div>
-    </div>`;
-  const seq = container.querySelector("#seq");
-  const wait = (ms) => new Promise(r => setTimeout(r, ms));
-  for (const label of steps) {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:0.75rem;opacity:0;transition:opacity 0.4s;";
-    row.innerHTML = `<span class="seq-dot" style="width:16px;height:16px;border:2px solid hsl(var(--primary));border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin 0.8s linear infinite;"></span>
-      <span style="color:hsl(var(--text-muted));">${label}</span>`;
-    seq.appendChild(row);
-    requestAnimationFrame(() => (row.style.opacity = "1"));
-    await wait(650);
-    row.querySelector(".seq-dot").style.cssText = "color:hsl(var(--success));font-weight:700;";
-    row.querySelector(".seq-dot").textContent = "✓";
-    row.lastElementChild.style.color = "hsl(var(--text))";
-  }
-  await wait(350);
-  seq.insertAdjacentHTML("beforeend", `
-    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-    <div style="margin-top:1.5rem;opacity:0;transition:opacity 0.6s;" id="seq-done">
-      <h2 style="font-size:1.35rem;font-weight:650;line-height:1.4;">We've built the first version of your Business Twin.</h2>
-      <p style="color:hsl(var(--text-muted));margin-top:0.5rem;">Opening your Executive Diagnosis…</p>
-    </div>`);
-  requestAnimationFrame(() => (container.querySelector("#seq-done").style.opacity = "1"));
-  await wait(1400);
-}
-
-const STATUS_STYLE = {
-  healthy: { color: "hsl(var(--success))", label: "Healthy" },
-  pressure: { color: "hsl(38 92% 55%)", label: "Pressure" },
-  constraint: { color: "hsl(var(--danger,0 72% 55%))", label: "Critical" },
-  captured: { color: "hsl(var(--primary))", label: "Captured" },
-  incomplete: { color: "hsl(var(--text-muted))", label: "Incomplete" },
-  insufficient: { color: "hsl(var(--text-muted))", label: "Need more data" },
+const MODULE_META = {
+  context: { subtitle: "Business context before we test how revenue is earned." },
+  reflection: { subtitle: "Your hypothesis — captured before we examine each system." },
+  demand: { tags: ["Thin funnel", "Single source risk", "No marketing cadence", "Sporadic pipeline"] },
+  qualification: { tags: ["No qualification filter", "Calendar pollution", "Low worth-it rate"] },
+  conversion: { tags: ["Low close rate", "Weak follow-up discipline", "Founder dependency", "Undocumented process", "Long sales cycle"] },
+  pricing: { tags: ["Underpricing", "Habitual discounting", "Stale prices", "Low confidence"] },
+  retention: { tags: ["Low repeat rate", "Unknown churn", "No retention process"] },
+  operations: { tags: ["Founder in every sale", "Undocumented process", "Delegation gap"] },
 };
 
-function ruleIdChip(ruleId, rulePack) {
-  if (!ruleId) return "";
-  const pack = rulePack ? ` · ${rulePack}` : "";
-  return `<span style="display:inline-block;background:hsl(var(--primary) / 0.12);border:1px solid hsl(var(--primary) / 0.35);border-radius:6px;padding:0.12rem 0.45rem;font-size:0.68rem;font-weight:600;letter-spacing:0.04em;color:hsl(var(--primary));margin-right:0.35rem;vertical-align:middle;">${ruleId}${pack}</span>`;
+const QUESTION_EVIDENCE = {
+  conversion_close_rate: { level: "High", detail: "Invoices + Leads" },
+  conversion_followups: { level: "Medium", detail: "Self-reported" },
+  conversion_owner: { level: "High", detail: "Activity data" },
+  conversion_process: { level: "Low", detail: "Self-reported" },
+  conversion_cycle_days: { level: "High", detail: "Invoice dates" },
+  leads_per_month: { level: "Medium", detail: "Self-reported" },
+  pct_leads_worth_it: { level: "Medium", detail: "Self-reported" },
+  repeat_rate: { level: "Medium", detail: "Self-reported" },
+  pricing_confidence: { level: "Low", detail: "Self-reported" },
+  gross_margin_band: { level: "Low", detail: "Optional context" },
+  cac_known: { level: "Low", detail: "Optional context" },
+};
+
+const STATUS_STYLE = {
+  healthy: { cls: "is-healthy", label: "Healthy" },
+  pressure: { cls: "is-pressure", label: "Pressure" },
+  constraint: { cls: "is-critical", label: "Critical" },
+  captured: { cls: "is-moderate", label: "Captured" },
+  incomplete: { cls: "is-muted", label: "Incomplete" },
+  insufficient: { cls: "is-muted", label: "Need more data" },
+};
+
+function evidenceBadge(q) {
+  const ev = QUESTION_EVIDENCE[q.id] || { level: "Medium", detail: "Self-reported" };
+  const cls = ev.level === "High" ? "is-high" : ev.level === "Low" ? "is-low" : "is-medium";
+  return `<span class="diag-evidence ${cls}" title="${ev.detail}">Evidence: ${ev.level}</span>`;
 }
 
-const SYSTEM_FINDING_LABELS = [
-  ["finding", "Finding"],
-  ["root_cause", "Root Cause"],
-  ["business_impact", "Business Impact"],
-  ["score_line", "Score"],
-  ["recommended_action", "Recommended Action"],
-  ["expected_outcome", "Expected Outcome"],
-];
-
-function renderDiagnosisPreview(preview) {
-  if (!preview) return "";
-  const hv = preview.hypothesis_verdict;
-  const hvBorder = hv?.verdict === "contradicted" ? "hsl(38 92% 50% / 0.45)"
-    : hv?.verdict === "aligned" ? "hsl(var(--success) / 0.35)" : "hsl(var(--border))";
-  const ranking = (preview.priority_ranking || []).map((r, i) => `
-    <div style="display:flex;justify-content:space-between;padding:0.35rem 0;font-size:0.82rem;border-bottom:1px solid hsl(var(--border));">
-      <span>${i + 1}. ${r.label}</span>
-      <span style="color:hsl(var(--text-muted));">score ${r.score} · priority ${r.priority_score}</span>
-    </div>`).join("");
-  return `
-    <div style="margin-bottom:2rem;border:1px solid hsl(var(--primary) / 0.35);border-radius:12px;padding:1.35rem 1.5rem;background:hsl(var(--bg-subtle,220 14% 10%));">
-      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:hsl(var(--primary));margin-bottom:0.5rem;">Executive preview · ${preview.priority_model || "AFK-PRI-0001"}</div>
-      <div style="display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
-        <span style="font-size:2.5rem;font-weight:650;">${preview.health_score}</span>
-        <div>
-          <div style="font-weight:600;">${preview.primary_constraint}</div>
-          <div style="font-size:0.78rem;color:hsl(var(--text-muted));">Primary constraint · score ${preview.primary_score}/100</div>
-        </div>
-      </div>
-      ${hv ? `
-        <div style="border:1px solid ${hvBorder};border-radius:10px;padding:1rem;margin:0.75rem 0;">
-          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.35rem;">Your hypothesis</div>
-          <div style="font-size:0.9rem;margin-bottom:0.5rem;">"${hv.founder_hypothesis || "—"}"</div>
-          <div style="font-size:0.85rem;line-height:1.55;"><strong style="text-transform:capitalize;">${hv.verdict}</strong> — ${hv.explanation}</div>
-        </div>` : ""}
-      ${ranking ? `<div style="margin-top:0.75rem;"><div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.35rem;">Impact ranking (top 3)</div>${ranking}</div>` : ""}
-      ${(preview.compound_findings || []).length ? `
-        <div style="margin-top:0.75rem;">
-          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.35rem;">Cross-system patterns</div>
-          ${preview.compound_findings.map(c => `
-            <div style="font-size:0.82rem;line-height:1.55;padding:0.5rem 0;border-bottom:1px solid hsl(var(--border));">
-              ${c.compound_id ? `<span style="display:inline-block;background:hsl(var(--primary) / 0.1);border:1px solid hsl(var(--primary) / 0.3);border-radius:6px;padding:0.1rem 0.4rem;font-size:0.65rem;font-weight:600;color:hsl(var(--primary));margin-right:0.35rem;">${c.compound_id}</span>` : ""}
-              ${c.reasoning}
-            </div>`).join("")}
-        </div>` : ""}
-      <p style="font-size:0.75rem;color:hsl(var(--text-muted));margin-top:0.9rem;line-height:1.5;">Operator-judgment weights — not industry benchmarks. Full diagnosis has funnel checks and evidence provenance.</p>
-    </div>`;
-}
-
-function renderPayoff(payoff) {
-  if (!payoff) return "";
-  const st = STATUS_STYLE[payoff.status] || STATUS_STYLE.incomplete;
-  const scoreBlock = payoff.dimension?.score != null ? `
-    <div style="margin-top:1rem;display:flex;align-items:baseline;gap:0.5rem;">
-      <span style="font-size:2rem;font-weight:700;">${payoff.dimension.score}</span>
-      <span style="color:hsl(var(--text-muted));font-size:0.85rem;">/100 · ${payoff.dimension.label}</span>
-    </div>` : "";
-
-  const findings = (payoff.findings || []).slice(0, 2).map(f => `
-    <li style="margin:0.5rem 0;line-height:1.55;font-size:0.9rem;">${ruleIdChip(f.rule_id, f.rule_pack)}${f.reasoning}</li>`).join("");
-
-  const ruledFindings = (payoff.findings || []).filter(f => f.rule_id).slice(0, 3);
-  const ruleProvenanceBlock = payoff.system_finding && ruledFindings.length ? `
-    <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid hsl(var(--border));">
-      <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.4rem;">Detection rules</div>
-      <div style="display:flex;flex-wrap:wrap;gap:0.35rem;">
-        ${ruledFindings.map(f => ruleIdChip(f.rule_id, f.rule_pack)).join("")}
-      </div>
-    </div>` : "";
-
-  const systemFinding = payoff.system_finding ? `
-    <div style="margin-top:1rem;display:grid;gap:0.85rem;">
-      ${SYSTEM_FINDING_LABELS.map(([key, label]) => payoff.system_finding[key] ? `
-        <div>
-          <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.25rem;">${label}</div>
-          <p style="font-size:0.88rem;line-height:1.6;margin:0;">${payoff.system_finding[key]}</p>
-        </div>` : "").join("")}
-    </div>` : "";
-
-  return `
-    <div style="margin-top:1.5rem;border:1px solid hsl(var(--border));border-radius:12px;padding:1.25rem 1.5rem;background:hsl(var(--bg-subtle,220 14% 10%));">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.35rem;">System finding</div>
-          <div style="font-weight:600;font-size:1.05rem;line-height:1.45;">${payoff.headline}</div>
-        </div>
-        <span style="font-size:0.72rem;font-weight:600;color:${st.color};border:1px solid ${st.color};border-radius:999px;padding:0.2rem 0.65rem;white-space:nowrap;">${st.label}</span>
-      </div>
-      ${payoff.verdict ? `<p style="margin-top:0.75rem;font-size:0.88rem;color:hsl(var(--text-muted));">${payoff.verdict}</p>` : ""}
-      ${scoreBlock}
-      ${systemFinding}
-      ${ruleProvenanceBlock}
-      ${!payoff.system_finding && findings ? `<ul style="margin:0.75rem 0 0 1.1rem;padding:0;">${findings}</ul>` : ""}
-      ${payoff.micro_action ? `
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid hsl(var(--border));">
-          <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.35rem;">If this is your constraint</div>
-          <p style="font-size:0.88rem;line-height:1.6;">${payoff.micro_action}</p>
-        </div>` : ""}
-      ${(payoff.contradictions || []).length ? `
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid hsl(var(--border));">
-          <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.5rem;">Belief vs uploaded evidence</div>
-          ${payoff.contradictions.map(c => `
-            <div style="border:1px solid hsl(38 92% 50% / 0.35);border-radius:8px;padding:0.85rem;margin-bottom:0.5rem;font-size:0.82rem;line-height:1.55;">
-              <div><strong>You said:</strong> "${c.belief.answer}"</div>
-              <div style="margin-top:0.35rem;"><strong>Evidence:</strong> ${c.evidence.value}${String(c.evidence.metric).includes("pct") || String(c.evidence.metric).includes("rate") ? "%" : ""} — ${c.evidence.basis}</div>
-            </div>`).join("")}
-        </div>` : ""}
-      ${payoff.confidence_note ? `<p style="margin-top:0.9rem;font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.5;">${payoff.confidence_note}</p>` : ""}
-      ${payoff.evidence_hint && !payoff.confidence_note ? `<p style="margin-top:0.9rem;font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.5;">${payoff.evidence_hint}</p>` : ""}
-    </div>`;
-}
-
-function fieldHtml(q, answers) {
+function fieldHtml(q, answers, qIndex) {
   const v = answers[q.id] ?? "";
-  if (q.type === "select") {
-    const opts = q.options.map(o => `<option value="${o}" ${v === o ? "selected" : ""}>${o}</option>`).join("");
-    return `<select class="input" data-q="${q.id}"><option value="">— Select —</option>${opts}</select>`;
-  }
-  if (q.type === "scale") {
+  const num = String(qIndex + 1).padStart(2, "0");
+
+  let control = "";
+  if (q.type === "select" && q.options?.length) {
+    control = `<div class="diag-choices" data-q="${q.id}">
+      ${q.options.map(o => `
+        <button type="button" class="diag-choice ${v === o ? "is-selected" : ""}" data-value="${o.replace(/"/g, "&quot;")}">${o}</button>`).join("")}
+    </div>`;
+  } else if (q.type === "scale") {
     const min = q.min ?? 0;
     const max = q.max ?? 100;
     const unit = q.unit ?? "";
     const cur = v !== "" ? v : Math.round((min + max) / 2);
-    return `<div style="display:flex;align-items:center;gap:0.75rem;">
-      <input class="input" type="range" data-q="${q.id}" min="${min}" max="${max}" value="${cur}" style="flex:1;">
-      <span data-scale-val="${q.id}" style="min-width:3rem;font-variant-numeric:tabular-nums;font-weight:600;">${cur}${unit}</span>
+    control = `<div class="diag-range">
+      <input type="range" data-q="${q.id}" min="${min}" max="${max}" value="${cur}">
+      <span class="diag-range-val" data-scale-val="${q.id}">${cur}${unit}</span>
     </div>`;
+  } else if (q.type === "number") {
+    control = `<div style="display:flex;align-items:center;gap:0.5rem;">
+      <input class="diag-number" type="number" data-q="${q.id}" value="${v}" placeholder="e.g. 45" min="0">
+      <span style="font-size:0.85rem;color:#94a3b8;">${q.unit || "days"}</span>
+    </div>`;
+  } else {
+    control = `<textarea class="diag-textarea" data-q="${q.id}" rows="2" placeholder="In your own words…">${v}</textarea>`;
   }
-  if (q.type === "number") {
-    return `<input class="input" type="number" data-q="${q.id}" value="${v}" placeholder="—" min="0">`;
-  }
-  return `<textarea class="input" data-q="${q.id}" rows="2" placeholder="In your own words…">${v}</textarea>`;
+
+  const optional = q.optional ? ` <span style="font-size:0.72rem;color:#94a3b8;font-weight:400;">(optional)</span>` : "";
+  return `
+    <div class="diag-qcard">
+      <div class="diag-qhead">
+        <div style="display:flex;gap:0.75rem;flex:1;">
+          <span class="diag-qnum">${num}</span>
+          <p class="diag-qlabel">${q.label}${optional}</p>
+        </div>
+        ${evidenceBadge(q)}
+      </div>
+      ${control}
+    </div>`;
 }
 
 function collectAnswers(container) {
   const payload = {};
-  container.querySelectorAll("[data-q]").forEach(el => { payload[el.dataset.q] = el.value; });
+  container.querySelectorAll("[data-q]").forEach(el => {
+    if (el.classList?.contains("diag-choices")) return;
+    if (el.type === "range" || el.type === "number" || el.tagName === "TEXTAREA") {
+      payload[el.dataset.q] = el.value;
+    }
+  });
+  container.querySelectorAll(".diag-choices").forEach(group => {
+    const sel = group.querySelector(".diag-choice.is-selected");
+    if (sel) payload[group.dataset.q] = sel.dataset.value;
+  });
   return payload;
 }
 
-// Revenue Diagnostic Instrument — one Business System at a time, payoff after each block.
+function wireInteractions(container, state, render) {
+  container.querySelectorAll('input[type="range"][data-q]').forEach(slider => {
+    const out = container.querySelector(`[data-scale-val="${slider.dataset.q}"]`);
+    const unit = state.modules.flatMap(m => m.questions).find(q => q.id === slider.dataset.q)?.unit ?? "";
+    const sync = () => { if (out) out.textContent = `${slider.value}${unit}`; };
+    slider.addEventListener("input", sync);
+    sync();
+  });
+
+  container.querySelectorAll(".diag-choices").forEach(group => {
+    group.querySelectorAll(".diag-choice").forEach(btn => {
+      btn.addEventListener("click", () => {
+        group.querySelectorAll(".diag-choice").forEach(b => b.classList.remove("is-selected"));
+        btn.classList.add("is-selected");
+      });
+    });
+  });
+
+  container.querySelector("[data-breakdown-toggle]")?.addEventListener("click", () => {
+    const el = container.querySelector("[data-breakdown]");
+    if (el) el.hidden = !el.hidden;
+  });
+}
+
+function renderPayoff(payoff, showBreakdown) {
+  if (!payoff) return "";
+  const st = STATUS_STYLE[payoff.status] || STATUS_STYLE.incomplete;
+  const score = payoff.dimension?.score;
+  const findings = payoff.findings || [];
+
+  const breakdownRows = findings.map(f => `
+    <div class="diag-breakdown-row is-hit">
+      <span>${ruleIdChip(f.rule_id, f.rule_pack)}${(f.reasoning || "").slice(0, 48)}…</span>
+      <span class="diag-breakdown-pen is-hit">-${f.penalty || "?"}</span>
+    </div>`).join("");
+
+  const totalPen = findings.reduce((s, f) => s + (f.penalty || 0), 0);
+
+  const ruledFindings = findings.filter(f => f.rule_id).slice(0, 4);
+
+  const sections = payoff.system_finding
+    ? [
+        ["Finding", payoff.system_finding.finding],
+        ["Root Cause", payoff.system_finding.root_cause],
+        ["Business Impact", payoff.system_finding.business_impact],
+        ["Score", payoff.system_finding.score_line],
+        ["Recommended Action", payoff.system_finding.recommended_action],
+        ["Expected Outcome", payoff.system_finding.expected_outcome],
+      ].filter(([, c]) => c)
+    : [[ "Finding", payoff.headline ]];
+
+  return `
+    <div class="diag-result">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <p class="diag-result-kicker">Assessment Result</p>
+        <span class="diag-status-pill ${st.cls}">${st.label}</span>
+      </div>
+      ${score != null ? renderGauge(score) : ""}
+      ${findings.length ? `
+        <button type="button" class="diag-breakdown-toggle" data-breakdown-toggle>Scoring breakdown</button>
+        <div data-breakdown ${showBreakdown ? "" : "hidden"}>
+          ${breakdownRows}
+          <div class="diag-breakdown-row" style="font-weight:600;">
+            <span>Total penalty</span>
+            <span class="diag-breakdown-pen is-hit">-${totalPen}</span>
+          </div>
+        </div>` : ""}
+      ${ruledFindings.length ? `
+        <div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.35rem;">
+          ${ruledFindings.map(f => ruleIdChip(f.rule_id, f.rule_pack)).join("")}
+        </div>` : ""}
+      <div style="margin-top:0.5rem;">
+        ${sections.map(([label, content]) => `
+          <div class="diag-section">
+            <p class="diag-section-label">${label}</p>
+            <div class="diag-section-body">${content}</div>
+          </div>`).join("")}
+      </div>
+      ${(payoff.contradictions || []).length ? `
+        <div class="diag-section">
+          <p class="diag-section-label">Belief vs uploaded evidence</p>
+          ${payoff.contradictions.map(c => `
+            <div style="border:1px solid #fde68a;border-radius:8px;padding:0.85rem;margin-bottom:0.5rem;font-size:0.82rem;">
+              <div><strong>You said:</strong> "${c.belief.answer}"</div>
+              <div style="margin-top:0.35rem;"><strong>Evidence:</strong> ${c.evidence.value} — ${c.evidence.basis}</div>
+            </div>`).join("")}
+        </div>` : ""}
+      ${payoff.confidence_note ? `<p class="diag-hint">${payoff.confidence_note}</p>` : ""}
+      ${payoff.evidence_hint && !payoff.confidence_note ? `<p class="diag-hint">💡 ${payoff.evidence_hint}</p>` : ""}
+    </div>`;
+}
+
+function renderDiagnosisPreview(preview) {
+  if (!preview) return "";
+  const hv = preview.hypothesis_verdict;
+  return `
+    <div class="diag-preview">
+      <div class="diag-result-kicker">Executive preview · ${preview.priority_model || "AFK-PRI-0001"}</div>
+      ${renderGauge(preview.primary_score)}
+      <div style="text-align:center;margin-bottom:1rem;">
+        <div style="font-weight:600;">${preview.primary_constraint}</div>
+        <div style="font-size:0.78rem;color:#64748b;">Health ${preview.health_score}/100</div>
+      </div>
+      ${hv ? `<p class="diag-section-body"><strong>${hv.verdict}</strong> — ${hv.explanation}</p>` : ""}
+      ${(preview.compound_findings || []).length ? `
+        <div style="margin-top:0.75rem;">
+          ${preview.compound_findings.map(c => `
+            <div class="diag-section-body" style="padding:0.35rem 0;">${ruleIdChip(c.compound_id)}${c.reasoning}</div>`).join("")}
+        </div>` : ""}
+    </div>`;
+}
+
+async function runAnalysisSequence(container) {
+  const steps = ["Analyzing your business…", "Building your Business Twin", "Detecting constraints", "Calculating Revenue Health"];
+  container.innerHTML = `<div class="diag-page"><div class="diag-inner" style="padding-top:18vh;"><div id="seq" style="display:flex;flex-direction:column;gap:1rem;"></div></div></div>`;
+  const seq = container.querySelector("#seq");
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  for (const label of steps) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:0.75rem;";
+    row.innerHTML = `<span style="width:16px;height:16px;border:2px solid #b45309;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span><span style="color:#94a3b8;">${label}</span>`;
+    seq.appendChild(row);
+    await wait(550);
+    row.innerHTML = `<span style="color:#4c7a4a;font-weight:700;">✓</span><span>${label}</span>`;
+  }
+  await wait(400);
+  seq.insertAdjacentHTML("beforeend", `<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    <h2 style="font-family:'Lora',Georgia,serif;font-size:1.35rem;margin-top:1rem;">Your Business Twin is ready.</h2>
+    <p style="color:#94a3b8;">Opening Executive Diagnosis…</p>`);
+  await wait(1200);
+}
 
 export async function renderAudit(container, startModuleId = null) {
-  container.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:50vh;"><span style="color:hsl(var(--text-muted));font-size:0.9rem;">Loading diagnostic…</span></div>`;
+  container.innerHTML = `<div class="diag-page"><div class="diag-inner" style="padding:3rem 0;text-align:center;color:#94a3b8;">Loading diagnostic…</div></div>`;
 
   let state;
   try {
     state = await API.get("/intelligence/audit/modules");
   } catch (e) {
-    container.innerHTML = `<div class="card" style="max-width:640px;margin:3rem auto;">Could not load audit: ${e.message}</div>`;
+    container.innerHTML = `<div class="diag-page"><div class="diag-inner"><p>Could not load audit: ${e.message}</p></div></div>`;
     return;
   }
 
   let activeId = startModuleId || state.current_module || state.modules[0]?.id;
   let showingPayoff = false;
   let lastPayoff = null;
+  let showBreakdown = true;
 
   const render = () => {
     const mod = state.modules.find(m => m.id === activeId) || state.modules[0];
     const idx = state.modules.findIndex(m => m.id === mod.id);
     const answers = state.answers || {};
     const pct = Math.round((state.systems_complete / state.systems_total) * 100);
+    const meta = MODULE_META[mod.id] || {};
+    const tags = (meta.tags || []).map(t => `<span class="diag-tag">${t}</span>`).join("");
 
     const stepper = state.modules.map((m, i) => {
       const done = m.progress.complete;
       const active = m.id === mod.id;
       const dot = done ? "✓" : String(i + 1);
-      return `<button type="button" data-goto="${m.id}" style="display:flex;align-items:center;gap:0.4rem;background:none;border:none;cursor:pointer;padding:0.25rem 0.5rem;opacity:${active ? 1 : 0.55};">
-        <span style="width:1.4rem;height:1.4rem;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600;border:1px solid ${done ? "hsl(var(--success))" : active ? "hsl(var(--primary))" : "hsl(var(--border))"};color:${done ? "hsl(var(--success))" : "inherit"};">${dot}</span>
-        <span style="font-size:0.72rem;max-width:5rem;text-align:left;line-height:1.2;">${m.title.replace(" System", "").replace(" & Monetization", "")}</span>
+      const cls = ["diag-step", active ? "is-active" : "", done ? "is-done" : ""].filter(Boolean).join(" ");
+      return `<button type="button" class="${cls}" data-goto="${m.id}">
+        <span class="diag-step-dot">${dot}</span>
+        <span>${m.title.replace(" System", "").replace(" & Monetization", "")}</span>
       </button>`;
     }).join("");
 
     const requiredQs = mod.questions.filter(q => !q.optional);
     const optionalQs = mod.questions.filter(q => q.optional);
-    const renderQ = (q) => `
-      <label style="display:block;margin-bottom:1rem;">
-        <span style="display:block;font-size:0.85rem;margin-bottom:0.35rem;">
-          ${q.label}${q.optional ? ` <span style="font-size:0.72rem;color:hsl(var(--text-muted));font-weight:400;">(optional — not scored yet)</span>` : ""}
-        </span>
-        ${fieldHtml(q, answers)}
-      </label>`;
-    const questions = requiredQs.map(renderQ).join("");
+    const questions = requiredQs.map((q, i) => fieldHtml(q, answers, i)).join("");
     const optionalBlock = optionalQs.length ? `
-      <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px dashed hsl(var(--border));">
-        <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.75rem;">Optional context · AFK-AUD-0001 phase-b</div>
-        ${optionalQs.map(renderQ).join("")}
+      <div class="diag-optional-block">
+        <div class="diag-optional-kicker">Optional context · AFK-AUD-0001 phase-b</div>
+        ${optionalQs.map((q, i) => fieldHtml(q, answers, requiredQs.length + i)).join("")}
       </div>` : "";
 
     container.innerHTML = `
-      <div style="max-width:720px;margin:0 auto;">
-        <div style="padding:2rem 0 1rem;">
-          <div style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.5rem;">Revenue Diagnostic</div>
-          <h1 style="font-size:1.65rem;font-weight:600;">One system at a time.</h1>
-          <p style="color:hsl(var(--text-muted));margin-top:0.5rem;line-height:1.6;max-width:52ch;font-size:0.9rem;">
-            ${state.systems_complete} of ${state.systems_total} systems examined.
-            You see findings after each block — not only at the end.
-          </p>
-          <div style="margin-top:1rem;height:4px;background:hsl(var(--border));border-radius:2px;overflow:hidden;">
-            <div style="height:100%;width:${pct}%;background:hsl(var(--primary));transition:width 0.4s;"></div>
+      <div class="diag-page">
+        <div class="diag-inner">
+          <div class="diag-hero">
+            <p class="diag-hero-kicker">Revenue Diagnostic · System ${idx + 1} of ${state.modules.length}</p>
+            <h1>${mod.title}</h1>
+            <p>${mod.hook || meta.subtitle || ""}</p>
+            ${tags ? `<div class="diag-tags">${tags}</div>` : ""}
           </div>
-        </div>
 
-        <div style="display:flex;gap:0.25rem;flex-wrap:wrap;padding-bottom:1.5rem;border-bottom:1px solid hsl(var(--border));">${stepper}</div>
+          <div class="diag-progress"><div style="width:${pct}%;"></div></div>
+          <p style="font-size:0.78rem;color:#94a3b8;margin:0 0 1rem;">${state.systems_complete} of ${state.systems_total} systems examined</p>
 
-        ${state.systems_complete === state.systems_total && state.diagnosis_preview ? renderDiagnosisPreview(state.diagnosis_preview) : ""}
+          <div class="diag-stepper">${stepper}</div>
 
-        <section style="padding:2rem 0;">
-          <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:hsl(var(--primary));margin-bottom:0.35rem;">System ${idx + 1} of ${state.modules.length}</div>
-          <h2 style="font-size:1.25rem;font-weight:600;margin-bottom:0.35rem;">${mod.title}</h2>
-          <p style="font-size:0.88rem;color:hsl(var(--text-muted));line-height:1.55;margin-bottom:1.5rem;">${mod.hook}</p>
+          ${state.systems_complete === state.systems_total && state.diagnosis_preview ? renderDiagnosisPreview(state.diagnosis_preview) : ""}
 
-          ${showingPayoff && lastPayoff ? renderPayoff(lastPayoff) : `
-            <div style="display:grid;gap:0.25rem;">${questions}${optionalBlock}</div>
-            ${mod.evidence_hint ? `<p style="margin-top:1rem;font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.5;">💡 ${mod.evidence_hint}</p>` : ""}
+          ${showingPayoff && lastPayoff ? renderPayoff(lastPayoff, showBreakdown) : `
+            <div>${questions}${optionalBlock}</div>
+            ${mod.evidence_hint ? `<p class="diag-hint">💡 ${mod.evidence_hint}</p>` : ""}
           `}
-        </section>
 
-        <div style="padding:0 0 3rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
-          ${showingPayoff ? `
-            <button class="btn btn-primary" id="audit-next">${idx < state.modules.length - 1 ? "Next system →" : "View full diagnosis →"}</button>
-            <button class="btn btn-secondary" id="audit-edit">Edit answers</button>
-          ` : `
-            <button class="btn btn-primary" id="audit-save">${idx < state.modules.length - 1 ? "Save & see finding" : "Finish & diagnose"}</button>
-            ${idx > 0 ? `<button class="btn btn-secondary" id="audit-back">← Previous</button>` : ""}
-          `}
-          <span style="font-size:0.78rem;color:hsl(var(--text-muted));">${mod.progress.answered}/${mod.progress.total} in this system</span>
+          <div class="diag-actions">
+            ${showingPayoff ? `
+              <button type="button" class="diag-btn-primary" id="audit-next">${idx < state.modules.length - 1 ? "Next system →" : "View full diagnosis →"}</button>
+              <button type="button" class="diag-btn-secondary" id="audit-edit">Edit answers</button>
+            ` : `
+              <button type="button" class="diag-btn-primary" id="audit-save">${idx < state.modules.length - 1 ? "Save & see finding" : "Finish & diagnose"}</button>
+              ${idx > 0 ? `<button type="button" class="diag-btn-secondary" id="audit-back">← Previous</button>` : ""}
+            `}
+            <span style="font-size:0.78rem;color:#94a3b8;">${mod.progress.answered}/${mod.progress.total} answered</span>
+          </div>
         </div>
       </div>`;
 
-    container.querySelectorAll('input[type="range"][data-q]').forEach(slider => {
-      const out = container.querySelector(`[data-scale-val="${slider.dataset.q}"]`);
-      const unit = state.modules.flatMap(m => m.questions).find(q => q.id === slider.dataset.q)?.unit ?? "";
-      const sync = () => { if (out) out.textContent = `${slider.value}${unit}`; };
-      slider.addEventListener("input", sync);
-      sync();
-    });
+    wireInteractions(container, state, render);
 
     container.querySelectorAll("[data-goto]").forEach(btn => {
       btn.addEventListener("click", () => {
