@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.knowledge_engine.registry import get_registry
 from backend.app.knowledge_engine.validation_framework import score_corpus
+from backend.app.knowledge_engine.moat_scorecard import compute_moat_scorecard
 from backend.app.models.auth import User
 from backend.app.api.deps import get_current_user
 
@@ -19,6 +20,12 @@ def kb_stats(current_user: User = Depends(get_current_user)):
 def kb_validation_corpus(current_user: User = Depends(get_current_user)):
     """AFK-VAL-0001 corpus scorecard — descriptive only until N≥10 cases."""
     return score_corpus()
+
+
+@router.get("/moat")
+def kb_moat_scorecard(current_user: User = Depends(get_current_user)):
+    """AFK-MOA-0001 machine-verified competitive moat vs generic AI business tools."""
+    return compute_moat_scorecard()
 
 
 @router.get("/search")

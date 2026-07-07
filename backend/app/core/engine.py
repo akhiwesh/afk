@@ -795,6 +795,7 @@ def build_science_provenance(kb_release: str | None = None) -> dict:
         "audit_spec_id": "AFK-AUD-0001",
         "rule_pack": RULE_PACK_ID,
         "compound_pack": COMPOUND_PACK_ID,
+        "moat_spec_id": "AFK-MOA-0001",
         "note": "Findings cite AFK-DET-* via rule_provenance; compounds cite AFK-CMP-* via compound_runtime.",
     }
 

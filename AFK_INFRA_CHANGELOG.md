@@ -119,6 +119,14 @@
 **Shipped:** `compound_pack: kb-cmp-v1`; wizard diagnosis preview + health footer; PARITY tests
 **Rejected:** KB-compiled trigger DSL interpreter (deferred Phase B.2)
 
+## INF-22 — Competitive moat scorecard (Loop #10)
+**Shipped:** `AFK-MOA-0001`; `moat_scorecard.py`; `GET /knowledge/moat`; `scripts/verify_moat.py`
+**Rejected:** Marketing NPS/retention claims without outcome data
+
+## INF-23 — GitHub sync (Loop #10)
+**Shipped:** `feature/diagnostic-v3-phase1-honesty` pushed to `github.com/akhiwesh/afk` (loops 6–9 commit)
+**PR:** https://github.com/akhiwesh/afk/pull/new/feature/diagnostic-v3-phase1-honesty
+
 ---
 
 ## Pending (requires external evidence)

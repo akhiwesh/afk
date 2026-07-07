@@ -1,0 +1,62 @@
+id: AFK-MOA-0001
+type: moat_spec
+name: AFK competitive moat vs generic AI business tools
+version: 1.0.0
+status: hypothesis
+owner: chief_epistemologist
+description: >-
+  Defines measurable pillars where AFK must outperform probabilistic LLM advisors:
+  epistemic honesty, scientific versioning, KB parity, validation discipline, and
+  belief-vs-evidence separation. Scorecard is machine-verified — not marketing copy.
+competitive_frame: >-
+  Generic AI business tools optimize fluent advice. AFK optimizes auditable diagnosis:
+  every constraint cites AFK-DET-* rules, confidence is capped without uploads,
+  contradictions surface belief vs evidence, and the validation protocol refuses
+  calibration claims until the case corpus gate clears.
+pillars:
+- id: epistemic_honesty
+  name: Epistemic honesty (AFK-CFM-0001)
+  weight: 15
+  competitor_gap: LLM tools present advice with implicit certainty; AFK caps questionnaire confidence at 40%.
+  verification: engine uses AFK-CFM-0001 ceiling; epistemic confidence on dimensions
+- id: scientific_versioning
+  name: Scientific versioning (DET + CMP packs)
+  weight: 15
+  competitor_gap: Competitors cannot replay which rule version produced a finding.
+  verification: findings carry rule_id; compound_findings carry compound_id; science_provenance packs
+- id: kb_parity
+  name: Knowledge base parity
+  weight: 15
+  competitor_gap: Competitor logic lives in prompts — opaque and unversioned.
+  verification: registry object counts match engine; DET penalty parity test passes
+- id: validation_discipline
+  name: Validation discipline (AFK-VAL-0001)
+  weight: 15
+  competitor_gap: Competitors lack falsifiable calibration gates.
+  verification: corpus scorecard runs; calibration_ready false until N>=10
+- id: deterministic_diagnosis
+  name: Deterministic diagnosis
+  weight: 10
+  competitor_gap: LLM outputs vary run-to-run on identical inputs.
+  verification: compute_health identical on repeat with same answers
+- id: belief_evidence_split
+  name: Belief vs evidence separation
+  weight: 15
+  competitor_gap: Competitors merge founder narrative with uploaded data silently.
+  verification: contradiction detection wired; hypothesis verdict on diagnosis
+- id: never_invent_ladder
+  name: Never-invent validation ladder
+  weight: 15
+  competitor_gap: Competitors invent benchmarks and claim validation without corpus.
+  verification: all KB objects at hypothesis until case studies justify promotion
+todos:
+- 'TODO(research): industry-specific moat pillars after N>=10 calibrated cases.'
+created:
+  by: AFK Research Loop #10
+  date: '2026-07-07'
+  reason: 'Competitive moat scorecard — machine-verified differentiation vs AI biz tools'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #10
+  reason: 'Competitive moat scorecard — machine-verified differentiation vs AI biz tools'

@@ -13,7 +13,7 @@ from backend.app.core import evidence_intel as evi
 def test_registry_loads_and_validates():
     r = load_registry()
     s = r.stats()
-    assert s["total_objects"] >= 85
+    assert s["total_objects"] >= 86
     assert s["by_type"].get("compound_pattern") == 3
     assert s["by_type"]["business_system"] == len(ce.DIMENSIONS)
     assert s["by_type"]["questionnaire_item"] == len(ce.QUESTIONS) + len(ce.OPTIONAL_QUESTIONS)

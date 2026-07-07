@@ -47,6 +47,7 @@ TYPE_REGISTRY = {
     "validation_protocol": ("VAL", "validation_protocols", ["protocol", "scorecard", "acceptance_criteria"]),
     "audit_spec":        ("AUD", "audit_specs",       ["spec_version", "question_reforms"]),
     "compound_pattern":  ("CMP", "compound_patterns", ["definition", "systems", "trigger"]),
+    "moat_spec":         ("MOA", "moat_specs",        ["pillars", "competitive_frame"]),
 }
 
 RELATIONSHIP_TYPES = {

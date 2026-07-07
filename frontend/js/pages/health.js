@@ -15,8 +15,11 @@ const L = `style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercas
 export async function renderHealth(container) {
   container.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:50vh;"><span style="color:hsl(var(--text-muted));font-size:0.9rem;">Computing diagnosis from your evidence…</span></div>`;
 
-  let h;
-  try { h = await API.get("/intelligence/health"); }
+  let h, moat;
+  try {
+    h = await API.get("/intelligence/health");
+    try { moat = await API.get("/knowledge/moat"); } catch { moat = null; }
+  }
   catch (e) {
     container.innerHTML = `<div class="card" style="max-width:640px;margin:3rem auto;">Could not load diagnosis: ${e.message}</div>`;
     return;
@@ -336,6 +339,7 @@ export async function renderHealth(container) {
           ${h.science_provenance.priority_model_id} · ${h.science_provenance.confidence_model_id} ·
           ${h.science_provenance.engine_version} · ${h.science_provenance.rule_pack}
           ${h.science_provenance.compound_pack ? ` · ${h.science_provenance.compound_pack}` : ""}
+          ${moat ? ` · moat ${moat.moat_score}/100 (${moat.pillars_passed}/${moat.pillars_total})` : ""}
         </p>` : ""}
       </div>
     </div>`;
