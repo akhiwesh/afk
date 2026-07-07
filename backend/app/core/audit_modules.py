@@ -15,7 +15,7 @@ AUDIT_MODULES = [
         "sections": ["profile", "revenue"],
         "dimensions": [],
         "evidence_hint": None,
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": False,
     },
     {
@@ -25,7 +25,7 @@ AUDIT_MODULES = [
         "sections": ["demand"],
         "dimensions": ["demand"],
         "evidence_hint": "Upload a lead or CRM export to confirm volume and sources — self-report alone caps confidence at 40%.",
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": True,
     },
     {
@@ -35,7 +35,7 @@ AUDIT_MODULES = [
         "sections": ["qualification"],
         "dimensions": ["qualification"],
         "evidence_hint": "Lead statuses in a CRM export would measure how much time goes to wrong-fit leads.",
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": True,
     },
     {
@@ -45,7 +45,7 @@ AUDIT_MODULES = [
         "sections": ["conversion"],
         "dimensions": ["conversion"],
         "evidence_hint": "Invoices plus lead outcomes would compute your real close rate.",
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": True,
     },
     {
@@ -55,7 +55,7 @@ AUDIT_MODULES = [
         "sections": ["pricing"],
         "dimensions": ["pricing"],
         "evidence_hint": "Invoices with discount columns reveal real pricing behaviour — stronger than memory.",
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": True,
     },
     {
@@ -65,7 +65,7 @@ AUDIT_MODULES = [
         "sections": ["retention"],
         "dimensions": ["retention"],
         "evidence_hint": "12+ months of invoices measure true repeat rate.",
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": True,
     },
     {
@@ -75,7 +75,7 @@ AUDIT_MODULES = [
         "sections": ["operations"],
         "dimensions": ["founder_dependency"],
         "evidence_hint": "No uploadable evidence verifies this yet — call and meeting data arrives later.",
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": True,
     },
     {
@@ -85,7 +85,7 @@ AUDIT_MODULES = [
         "sections": ["goals"],
         "dimensions": [],
         "evidence_hint": None,
-        "min_coverage": 0.5,
+        "min_coverage": 1.0,
         "diagnostic": False,
     },
 ]
@@ -125,21 +125,20 @@ def module_progress(module: dict, answers: dict) -> dict:
         "answered": answered,
         "total": total,
         "coverage": coverage,
-        "complete": coverage >= module.get("min_coverage", 0.5) and answered > 0,
+        "complete": coverage >= module.get("min_coverage", 1.0) and answered > 0,
     }
 
 
 def _status_label(score: int | None, confidence: float, module_id: str | None = None) -> str:
-    if score is None or confidence < 0.5:
+    if score is None or not ce._dimension_scorable(confidence):
         return "insufficient"
-    if module_id == "conversion":
-        label = ce.conversion_status(score)
-        return {"Healthy": "healthy", "Moderate": "pressure", "Pressure": "pressure", "Critical": "constraint"}.get(label, "insufficient")
-    if score >= 75:
-        return "healthy"
-    if score >= 55:
-        return "pressure"
-    return "constraint"
+    label = ce.system_status(score)
+    return {
+        "Stable": "healthy",
+        "Watch": "pressure",
+        "Constrained": "pressure",
+        "Critical": "constraint",
+    }.get(label, "insufficient")
 
 
 def _headline(module: dict, dim: dict | None, progress: dict) -> str:
@@ -231,12 +230,15 @@ def compute_module_payoff(module_id: str, answers: dict) -> dict:
     payoff["status"] = status
     payoff["headline"] = _headline(module, dim, progress)
 
-    if module_id == "conversion" and score is not None:
-        system_finding = ce.build_conversion_system_finding(answers)
+    if score is not None and module.get("diagnostic"):
+        if module_id == "conversion":
+            system_finding = ce.build_conversion_system_finding(answers)
+        else:
+            dim_key = module["dimensions"][0]
+            system_finding = ce.build_system_finding(dim_key, answers)
         payoff["system_finding"] = system_finding
         payoff["headline"] = system_finding["finding"]
-        conv_status = system_finding["status"]
-        payoff["verdict"] = f"{dim['label']}: {conv_status.lower()} ({score}/100)."
+        payoff["verdict"] = f"{dim['label']}: {system_finding['status'].lower()} ({score}/100)."
     elif status == "healthy":
         payoff["verdict"] = f"{dim['label']}: no major pressure detected from your answers."
     elif status == "insufficient":

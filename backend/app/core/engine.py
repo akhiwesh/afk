@@ -161,10 +161,49 @@ def _ev(answers: dict, key: str) -> dict:
     return {"question": _QLABEL.get(key, key), "answer": answers.get(key), "id": key}
 
 
+MIN_DIMENSION_COVERAGE = 1.0  # Phase 1: all dimension fields required to score
+
+_CHAIN_CAP_CRITICAL = 55  # overall health capped when any system is Critical
+_CHAIN_CAP_WATCH = 70     # overall health capped when any system is Watch or worse
+
+
 def _dimension_confidence(answers: dict, dim_key: str) -> float:
     fields = DIMENSIONS[dim_key]["fields"]
     answered = sum(1 for f in fields if answers.get(f) not in (None, ""))
     return round(answered / len(fields), 2) if fields else 0.0
+
+
+def _dimension_scorable(conf: float) -> bool:
+    return conf >= MIN_DIMENSION_COVERAGE
+
+
+def _penalty_in_band(value: float, bands: list[tuple[float, float, int]]) -> int:
+    """First matching [low, high) band returns its penalty."""
+    for low, high, penalty in bands:
+        if low <= value < high:
+            return penalty
+    return 0
+
+
+def system_status(score: int) -> str:
+    """Unified V3 status bands (100 = healthy, 0 = severe constraint)."""
+    if score >= 85:
+        return "Stable"
+    if score >= 70:
+        return "Watch"
+    if score >= 55:
+        return "Constrained"
+    return "Critical"
+
+
+def conversion_status(score: int) -> str:
+    """Backward-compatible alias; maps V3 labels to conversion v2 names in tests."""
+    return {
+        "Stable": "Healthy",
+        "Watch": "Moderate",
+        "Constrained": "Pressure",
+        "Critical": "Critical",
+    }.get(system_status(score), "Critical")
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +215,11 @@ def _dimension_confidence(answers: dict, dim_key: str) -> float:
 def _rules_demand(a: dict) -> list[dict]:
     out = []
     leads = _num(a, "leads_per_month")
-    if leads is not None and leads < 10:
-        out.append({"penalty": 30, "evidence": [_ev(a, "leads_per_month")],
-                    "reasoning": f"{int(leads)} new leads per month is a thin top of funnel. Almost any downstream improvement is capped by this volume."})
+    if leads is not None:
+        pen = _penalty_in_band(leads, [(0, 10, 30), (10, 20, 20), (20, 30, 10)])
+        if pen:
+            out.append({"penalty": pen, "evidence": [_ev(a, "leads_per_month")],
+                        "reasoning": f"{int(leads)} new leads per month limits top-of-funnel capacity — downstream fixes cannot outrun thin volume."})
     if a.get("lead_sources_count") == "One":
         src = a.get("primary_lead_source", "a single source")
         out.append({"penalty": 25, "evidence": [_ev(a, "lead_sources_count"), _ev(a, "primary_lead_source")],
@@ -187,48 +228,56 @@ def _rules_demand(a: dict) -> list[dict]:
         out.append({"penalty": 20, "evidence": [_ev(a, "marketing_active")],
                     "reasoning": "No consistent weekly marketing activity means lead flow is not under the business's control."})
     elif a.get("marketing_active") == "Sporadic":
-        out.append({"penalty": 10, "evidence": [_ev(a, "marketing_active")],
+        out.append({"penalty": 12, "evidence": [_ev(a, "marketing_active")],
                     "reasoning": "Sporadic marketing produces sporadic pipeline; revenue inherits the inconsistency about one sales cycle later."})
     return out
 
 
 def _rules_qualification(a: dict) -> list[dict]:
     out = []
-    if a.get("qualification_process", "").startswith("No real qualification"):
+    qp = a.get("qualification_process", "")
+    if qp.startswith("No real qualification"):
         out.append({"penalty": 30, "evidence": [_ev(a, "qualification_process")],
                     "reasoning": "Talking to every lead means the calendar fills with the wrong ones. Time is the scarcest asset in a founder-led sales motion."})
+    elif qp == "Informal gut-feel":
+        out.append({"penalty": 15, "evidence": [_ev(a, "qualification_process")],
+                    "reasoning": "Qualification lives in gut-feel — wrong-fit leads still consume calendar and selling energy without a repeatable filter."})
     pct = _num(a, "pct_leads_worth_it")
-    if pct is not None and pct < 30:
-        out.append({"penalty": 25, "evidence": [_ev(a, "pct_leads_worth_it")],
-                    "reasoning": f"Only ~{int(pct)}% of leads are worth the time — most selling effort is spent on people who were never going to buy."})
+    if pct is not None:
+        pen = _penalty_in_band(pct, [(0, 30, 25), (30, 40, 18), (40, 50, 12)])
+        if pen:
+            out.append({"penalty": pen, "evidence": [_ev(a, "pct_leads_worth_it")],
+                        "reasoning": f"Only ~{int(pct)}% of leads are worth the time — selling effort is spent on people who were never going to buy."})
+        leads = _num(a, "leads_per_month")
+        if pct < 50 and leads is not None and leads >= 10:
+            out.append({"penalty": 8, "evidence": [_ev(a, "pct_leads_worth_it"), _ev(a, "leads_per_month")],
+                        "reasoning": "Calendar pollution — enough lead volume that weak qualification silently taxes the whole sales motion."})
     return out
 
 
-def conversion_status(score: int) -> str:
-    """Conversion System v2 status bands."""
-    if score >= 85:
-        return "Healthy"
-    if score >= 70:
-        return "Moderate"
-    if score >= 55:
-        return "Pressure"
-    return "Critical"
+def _dimension_score(answers: dict, dim_key: str) -> int:
+    return max(0, 100 - sum(f["penalty"] for f in _RULES[dim_key](answers)))
 
 
 def _conversion_score(answers: dict) -> int:
-    return max(0, 100 - sum(f["penalty"] for f in _rules_conversion(answers)))
+    return _dimension_score(answers, "conversion")
 
 
 def _rules_conversion(a: dict) -> list[dict]:
     out = []
     close = _num(a, "conversion_close_rate")
-    if close is not None and close < 30:
-        out.append({"penalty": 22, "evidence": [_ev(a, "conversion_close_rate")],
-                    "reasoning": f"Only ~{int(close)}% of serious leads convert — revenue is leaking after qualification, inside follow-up or closing."})
+    if close is not None:
+        pen = _penalty_in_band(close, [(0, 15, 30), (15, 25, 22), (25, 30, 15)])
+        if pen:
+            out.append({"penalty": pen, "evidence": [_ev(a, "conversion_close_rate")],
+                        "reasoning": f"Only ~{int(close)}% of serious leads convert — revenue is leaking after qualification, inside follow-up or closing."})
     followups = a.get("conversion_followups", "")
     if followups in ("1", "2"):
         out.append({"penalty": 20, "evidence": [_ev(a, "conversion_followups")],
                     "reasoning": f"Giving up after {followups} follow-up{'s' if followups != '1' else ''} leaves deals unfinished; most considered purchases need sustained touches."})
+    elif followups == "3":
+        out.append({"penalty": 8, "evidence": [_ev(a, "conversion_followups")],
+                    "reasoning": "Three follow-ups is below typical B2B persistence — deals often need more touches before a clear yes or no."})
     owner = a.get("conversion_owner", "")
     if owner in ("Founder only", "Founder leads most deals"):
         out.append({"penalty": 18, "evidence": [_ev(a, "conversion_owner")],
@@ -237,6 +286,9 @@ def _rules_conversion(a: dict) -> list[dict]:
     if process == "Mostly in people's heads":
         out.append({"penalty": 15, "evidence": [_ev(a, "conversion_process")],
                     "reasoning": "The sales process lives in people's heads — it cannot be delegated, improved, or diagnosed consistently."})
+    elif process == "Partially documented":
+        out.append({"penalty": 8, "evidence": [_ev(a, "conversion_process")],
+                    "reasoning": "Sales stages exist on paper but are not fully used — execution drift still creates inconsistent closes."})
     cycle = _num(a, "conversion_cycle_days")
     if cycle is not None and cycle > 90:
         out.append({"penalty": 10, "evidence": [_ev(a, "conversion_cycle_days")],
@@ -244,29 +296,79 @@ def _rules_conversion(a: dict) -> list[dict]:
     return out
 
 
-def build_conversion_system_finding(answers: dict) -> dict:
-    """Structured Conversion System v2 finding — deterministic from stated evidence."""
-    findings = _rules_conversion(answers)
-    score = _conversion_score(answers)
-    status = conversion_status(score)
-    play = _CONSTRAINT_PLAYBOOK["conversion"]
+_SYSTEM_FINDING_DEFAULTS = {
+    "demand": {
+        "finding": "Lead flow appears sufficient and diversified for the current stage.",
+        "root_cause": "No major demand-generation constraint detected from your answers.",
+        "business_impact": "Top-of-funnel volume is not the primary cap on revenue growth right now.",
+        "expected_outcome": "Maintain source diversity and weekly marketing cadence as you scale.",
+    },
+    "qualification": {
+        "finding": "Lead qualification is filtering the calendar effectively.",
+        "root_cause": "No major qualification constraint detected from your answers.",
+        "business_impact": "Selling time is concentrated on leads with reasonable fit.",
+        "expected_outcome": "Sustain documented criteria so qualification does not erode as volume grows.",
+    },
+    "conversion": {
+        "finding": "Serious interest is converting to revenue with disciplined follow-up and a usable sales process.",
+        "root_cause": "No major conversion constraint detected from your answers.",
+        "business_impact": "Paid revenue should track qualified demand without systematic leakage in follow-up or closing.",
+        "expected_outcome": "Maintain documented stages and follow-up discipline as volume grows.",
+    },
+    "pricing": {
+        "finding": "Pricing and discount discipline appear aligned with value capture.",
+        "root_cause": "No major pricing constraint detected from your answers.",
+        "business_impact": "Revenue per deal is not being silently eroded by systematic underpricing or discounting.",
+        "expected_outcome": "Continue periodic price tests on new prospects to validate willingness to pay.",
+    },
+    "retention": {
+        "finding": "Repeat revenue and retention mechanics look stable for your model.",
+        "root_cause": "No major retention constraint detected from your answers.",
+        "business_impact": "Growth is not fighting a leaking bucket of one-time customers.",
+        "expected_outcome": "Keep tracking why customers leave so retention stays deliberate, not accidental.",
+    },
+    "founder_dependency": {
+        "finding": "Revenue capacity is not critically bottlenecked on the founder alone.",
+        "root_cause": "No major founder-dependency constraint detected from your answers.",
+        "business_impact": "The business can grow without every incremental deal requiring founder hours.",
+        "expected_outcome": "Document and delegate more of the sales motion as volume increases.",
+    },
+}
+
+
+def _impact_with_revenue(answers: dict, dim_key: str, qualitative: str) -> str:
+    monthly_rev = _num(answers, "monthly_revenue")
+    play = _CONSTRAINT_PLAYBOOK.get(dim_key, {})
+    uplift = play.get("uplift", 0)
+    if not monthly_rev or not uplift:
+        return qualitative
+    annual = monthly_rev * 12
+    low = round(annual * uplift * 0.6)
+    high = round(annual * uplift * 1.3)
+    return (
+        f"{qualitative} Directional exposure: ₹{low:,}–₹{high:,}/yr "
+        f"({int(uplift * 60)}–{int(uplift * 130)}% band around {int(uplift * 100)}% of stated annual revenue)."
+    )
+
+
+def build_system_finding(dim_key: str, answers: dict) -> dict:
+    """Structured system finding — deterministic from stated evidence (Phase 1: all systems)."""
+    findings = _RULES[dim_key](answers)
+    score = _dimension_score(answers, dim_key)
+    status = system_status(score)
+    play = _CONSTRAINT_PLAYBOOK[dim_key]
+    defaults = _SYSTEM_FINDING_DEFAULTS[dim_key]
 
     if not findings:
-        finding = "Serious interest is converting to revenue with disciplined follow-up and a usable sales process."
-        root_cause = "No major conversion constraint detected from your answers."
-        impact = "Paid revenue should track qualified demand without systematic leakage in follow-up or closing."
-        expected = "Maintain documented stages and follow-up discipline as volume grows."
+        finding = defaults["finding"]
+        root_cause = defaults["root_cause"]
+        impact = defaults["business_impact"]
+        expected = defaults["expected_outcome"]
     else:
         finding = findings[0]["reasoning"]
         root_cause = "; ".join(f["reasoning"] for f in findings)
-        impact = (
-            "Revenue is lost after leads are already serious — marketing spend and selling time "
-            "do not fully convert to cash."
-        )
-        expected = (
-            "Higher close rate on existing serious leads, fewer deals dying in follow-up, "
-            "and less founder time per closed deal."
-        )
+        impact = _impact_with_revenue(answers, dim_key, _qualitative_impact(dim_key))
+        expected = _expected_outcome(dim_key)
 
     formatted = (
         f"Finding:\n{finding}\n\n"
@@ -290,6 +392,50 @@ def build_conversion_system_finding(answers: dict) -> dict:
     }
 
 
+def _qualitative_impact(dim_key: str) -> str:
+    return {
+        "demand": "Revenue growth is capped at the top of the funnel — downstream efficiency cannot compensate for thin or unreliable lead flow.",
+        "qualification": "Selling capacity is consumed by wrong-fit leads — conversion and pricing work on a polluted pipeline.",
+        "conversion": "Revenue is lost after leads are already serious — marketing spend and selling time do not fully convert to cash.",
+        "pricing": "Margin and revenue per customer are eroding — growth requires more volume to offset weak monetization.",
+        "retention": "The business refills a leaking bucket — acquisition spend fights churn instead of compounding.",
+        "founder_dependency": "Revenue throughput is capped by founder hours — scale is structurally limited until knowledge is delegated.",
+    }.get(dim_key, "This system is limiting overall revenue performance.")
+
+
+def _expected_outcome(dim_key: str) -> str:
+    return {
+        "demand": "More predictable lead volume from at least one additional controlled source.",
+        "qualification": "Higher share of calendar time on leads that can actually buy.",
+        "conversion": "Higher close rate on existing serious leads and fewer deals dying in follow-up.",
+        "pricing": "Improved revenue per deal without requiring more customers.",
+        "retention": "Higher repeat revenue and clearer reasons when customers leave.",
+        "founder_dependency": "More deals closed without founder presence in every step.",
+    }.get(dim_key, "Measurable improvement in this system's core metric within 90 days.")
+
+
+def build_conversion_system_finding(answers: dict) -> dict:
+    """Backward-compatible wrapper for conversion module."""
+    result = build_system_finding("conversion", answers)
+    # Expose conversion v2 status labels for existing tests/UI expectations
+    v2_status = conversion_status(result["score"])
+    result = {**result, "status": v2_status, "score_line": f"Score: {result['score']}/100 ({v2_status})"}
+    result["formatted"] = result["formatted"].replace(
+        f"({result['score']}/100 ({system_status(result['score'])})".replace("Score: ", ""),
+        f"Score: {result['score']}/100 ({v2_status})",
+    )
+    # Rebuild formatted with v2 label
+    result["formatted"] = (
+        f"Finding:\n{result['finding']}\n\n"
+        f"Root Cause:\n{result['root_cause']}\n\n"
+        f"Business Impact:\n{result['business_impact']}\n\n"
+        f"Score: {result['score']}/100 ({v2_status})\n\n"
+        f"Recommended Action:\n{result['recommended_action']}\n\n"
+        f"Expected Outcome:\n{result['expected_outcome']}"
+    )
+    return result
+
+
 def _rules_pricing(a: dict) -> list[dict]:
     out = []
     pc = a.get("pricing_confidence", "")
@@ -299,28 +445,59 @@ def _rules_pricing(a: dict) -> list[dict]:
     elif pc == "Honestly, no idea":
         out.append({"penalty": 20, "evidence": [_ev(a, "pricing_confidence")],
                     "reasoning": "Pricing has never been tested against willingness to pay; the current number is a guess carrying the whole P&L."})
-    if a.get("last_price_change") == "Never":
+    lpc = a.get("last_price_change", "")
+    if lpc == "Never":
         out.append({"penalty": 15, "evidence": [_ev(a, "last_price_change")],
                     "reasoning": "Prices have never changed while costs certainly have. Margin erodes silently every year."})
-    if a.get("discounting") == "Most deals":
+    elif lpc == "More than a year ago":
+        out.append({"penalty": 10, "evidence": [_ev(a, "last_price_change")],
+                    "reasoning": "Prices have been static for over a year — costs and market willingness to pay have likely shifted without you noticing."})
+    disc = a.get("discounting", "")
+    if disc == "Most deals":
         out.append({"penalty": 20, "evidence": [_ev(a, "discounting")],
                     "reasoning": "Discounting on most deals means the list price isn't real — buyers have learned to wait for it."})
+    elif disc == "Sometimes":
+        out.append({"penalty": 10, "evidence": [_ev(a, "discounting")],
+                    "reasoning": "Routine discounting trains buyers to negotiate — list price is not the real price."})
+    if pc == "Probably underpriced" and disc in ("Sometimes", "Most deals"):
+        out.append({"penalty": 8, "evidence": [_ev(a, "pricing_confidence"), _ev(a, "discounting")],
+                    "reasoning": "Double monetization leak — underpriced positioning plus habitual discounting compounds margin loss."})
+    if pc == "About right" and disc == "Sometimes":
+        out.append({"penalty": 8, "evidence": [_ev(a, "pricing_confidence"), _ev(a, "discounting")],
+                    "reasoning": "Pricing feels right on paper but routine discounting suggests list price is not what customers actually pay."})
     return out
+
+
+_REPEAT_MODELS = (
+    "Recurring (retainers / subscriptions)",
+    "Repeat transactional (orders)",
+    "Mixed",
+)
 
 
 def _rules_retention(a: dict) -> list[dict]:
     out = []
     rr = _num(a, "repeat_rate")
     model = a.get("revenue_model", "")
-    if rr is not None and rr < 30 and model in ("Recurring (retainers / subscriptions)", "Repeat transactional (orders)", "Mixed"):
-        out.append({"penalty": 30, "evidence": [_ev(a, "repeat_rate"), _ev(a, "revenue_model")],
-                    "reasoning": f"A ~{int(rr)}% repeat rate in a repeat-revenue model means the business refills a leaking bucket every month — growth spend is fighting churn."})
-    if a.get("churn_reason_known") == "No":
+    if rr is not None and model in _REPEAT_MODELS:
+        pen = _penalty_in_band(rr, [(0, 30, 30), (30, 45, 15), (45, 55, 8)])
+        if pen:
+            out.append({"penalty": pen, "evidence": [_ev(a, "repeat_rate"), _ev(a, "revenue_model")],
+                        "reasoning": f"A ~{int(rr)}% repeat rate in a repeat-revenue model means the business refills a leaking bucket — growth spend fights churn."})
+    churn = a.get("churn_reason_known", "")
+    if churn == "No":
         out.append({"penalty": 20, "evidence": [_ev(a, "churn_reason_known")],
                     "reasoning": "Nobody knows why customers leave, so retention can't be fixed — only guessed at."})
-    if a.get("retention_process") == "None":
+    elif churn == "Partially / anecdotally":
+        out.append({"penalty": 12, "evidence": [_ev(a, "churn_reason_known")],
+                    "reasoning": "Churn reasons are anecdotal, not tracked — retention fixes will stay reactive."})
+    rp = a.get("retention_process", "")
+    if rp == "None":
         out.append({"penalty": 15, "evidence": [_ev(a, "retention_process")],
                     "reasoning": "No deliberate reason for customers to come back; repeat revenue is being left to chance."})
+    elif rp == "Ad-hoc":
+        out.append({"penalty": 10, "evidence": [_ev(a, "retention_process")],
+                    "reasoning": "Retention is ad-hoc — repeat revenue depends on memory and goodwill, not a system."})
     return out
 
 
@@ -336,9 +513,44 @@ def _rules_founder(a: dict) -> list[dict]:
             extra = f" With a team of {int(team)}, the constraint is not headcount — it's that revenue knowledge lives in one person."
         out.append({"penalty": 25, "evidence": ev,
                     "reasoning": "Revenue is capped at the founder's personal hours." + extra})
+    elif fie == "Most deals":
+        out.append({"penalty": 15, "evidence": [_ev(a, "founder_in_every_sale")],
+                    "reasoning": "The founder is still in most deals — delegation is partial and throughput remains person-bound."})
     if a.get("documented_sales_process") == "No":
         out.append({"penalty": 15, "evidence": [_ev(a, "documented_sales_process")],
                     "reasoning": "An undocumented sales process can't be delegated, improved, or diagnosed — it can only be performed."})
+    if fie in ("Yes, every deal", "Most deals") and a.get("conversion_owner", "").startswith("Founder"):
+        out.append({"penalty": 8, "evidence": [_ev(a, "founder_in_every_sale"), _ev(a, "conversion_owner")],
+                    "reasoning": "Structural ceiling — founder owns both pipeline presence and follow-up/closing; revenue cannot scale past personal bandwidth."})
+    return out
+
+
+def _compound_findings(answers: dict, dims: list[dict]) -> list[dict]:
+    """Cross-system interactions (Phase 1)."""
+    by_key = {d["key"]: d for d in dims if d.get("score") is not None}
+    out = []
+
+    def _weak(key: str, threshold: int = 70) -> bool:
+        d = by_key.get(key)
+        return d is not None and d["score"] < threshold
+
+    leads = _num(answers, "leads_per_month")
+    if _weak("demand") and _weak("conversion") and leads is not None and leads < 20:
+        out.append({
+            "systems": ["demand", "conversion"],
+            "reasoning": "Funnel is too thin to diagnose conversion precisely — fix lead volume before optimizing close mechanics.",
+        })
+    if _weak("qualification") and _weak("conversion"):
+        out.append({
+            "systems": ["qualification", "conversion"],
+            "reasoning": "This may be a lead-quality problem disguised as a sales problem — calendar pollution upstream inflates close-rate pain.",
+        })
+    if answers.get("pricing_confidence") == "Probably underpriced" and answers.get("discounting") == "Sometimes":
+        if _weak("pricing", 80):
+            out.append({
+                "systems": ["pricing"],
+                "reasoning": "Double monetization leak — underpriced positioning plus routine discounting compounds margin erosion.",
+            })
     return out
 
 
@@ -437,7 +649,7 @@ def compute_health(answers: dict) -> dict:
         missing = [_QLABEL[f] for f in meta["fields"] if answers.get(f) in (None, "")]
         findings = _RULES[key](answers) if conf > 0 else []
         score = None
-        if conf >= 0.5:
+        if _dimension_scorable(conf):
             score = max(0, 100 - sum(f["penalty"] for f in findings))
             weighted_score += score * conf
             total_conf_weight += conf
@@ -459,7 +671,7 @@ def compute_health(answers: dict) -> dict:
             "completeness": completeness,
             "message": "Not enough evidence to diagnose. Complete more of the Revenue Audit — the engine will not guess.",
             "dimensions": dims_out,
-            "missing_summary": [d["label"] for d in dims_out if d["confidence"] < 0.5],
+            "missing_summary": [d["label"] for d in dims_out if not _dimension_scorable(d["confidence"])],
         }
 
     health = round(weighted_score / total_conf_weight)
@@ -467,7 +679,21 @@ def compute_health(answers: dict) -> dict:
     primary = min(scored, key=lambda d: d["score"])
     overall_conf = round(total_conf_weight / len(DIMENSIONS), 2)
 
-    risk = "Low Risk" if health >= 75 else ("Moderate Risk" if health >= 55 else "High Risk")
+    weakest = min(d["score"] for d in scored) if scored else health
+    if weakest <= _CHAIN_CAP_CRITICAL:
+        health = min(health, _CHAIN_CAP_CRITICAL)
+    elif weakest <= _CHAIN_CAP_WATCH:
+        health = min(health, _CHAIN_CAP_WATCH)
+    if any(system_status(d["score"]) == "Critical" for d in scored):
+        risk = "High Risk"
+    elif health >= 75 and weakest >= 70:
+        risk = "Low Risk"
+    elif health >= 55:
+        risk = "Moderate Risk"
+    else:
+        risk = "High Risk"
+
+    compound = _compound_findings(answers, dims_out)
 
     # Revenue opportunity: only when revenue evidence exists. Formula shown.
     opportunity = None
@@ -502,10 +728,13 @@ def compute_health(answers: dict) -> dict:
         "revenue_opportunity": opportunity,
         "recommended_next_step": play["next_step"] if play else None,
         "dimensions": sorted(dims_out, key=lambda d: (d["score"] is None, d["score"] if d["score"] is not None else 0)),
-        "missing_summary": [d["label"] for d in dims_out if d["confidence"] < 0.5],
+        "missing_summary": [d["label"] for d in dims_out if not _dimension_scorable(d["confidence"])],
+        "compound_findings": compound,
+        "weakest_system_score": weakest,
         "method_note": ("Scores are rule-based and deterministic. Every dimension starts at 100; each finding "
                         "subtracts a stated penalty, and every finding cites the answers it is based on. "
-                        "Confidence reflects how much of the audit is answered for that dimension."),
+                        "A system scores only when 100% of its evidence fields are answered. "
+                        "Overall health is capped when any system is Critical (<55)."),
     }
 
 

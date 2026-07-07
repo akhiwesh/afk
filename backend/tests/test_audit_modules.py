@@ -88,6 +88,13 @@ def test_conversion_module_payoff_includes_system_finding():
     assert "Recommended Action" in sf["formatted"]
 
 
+def test_diagnostic_modules_all_include_system_finding():
+    for module_id in ("demand", "qualification", "conversion", "pricing", "retention", "operations"):
+        payoff = am.compute_module_payoff(module_id, FULL_ANSWERS)
+        assert payoff.get("system_finding"), module_id
+        assert payoff["system_finding"].get("formatted")
+
+
 def test_get_audit_modules_endpoint(client: TestClient):
     h = _auth(client, "list-audit@test.com")
 

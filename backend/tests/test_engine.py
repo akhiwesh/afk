@@ -21,6 +21,25 @@ FULL_ANSWERS = {
     "self_diagnosis": "Need more leads", "biggest_worry": "Churn",
 }
 
+# Founder believes things are fine — Phase 1 must not score 98 "Low Risk"
+SOFT_ANSWERS = {
+    "business_type": "B2B services / agency", "industry": "Consulting", "team_size": 6,
+    "growth_stage": "Growing (repeatable sales)",
+    "monthly_revenue": 850000, "revenue_model": "Mixed", "avg_deal_value": 150000,
+    "revenue_goal_12m": 2500000,
+    "leads_per_month": 50, "lead_sources_count": "Two or three",
+    "primary_lead_source": "Referrals / word of mouth", "marketing_active": "Yes, systematic",
+    "qualification_process": "Documented criteria the team follows", "pct_leads_worth_it": 55,
+    "conversion_close_rate": 35, "conversion_followups": "3",
+    "conversion_owner": "Mostly team",
+    "conversion_process": "Partially documented", "conversion_cycle_days": 45,
+    "pricing_confidence": "About right", "last_price_change": "More than a year ago",
+    "discounting": "Sometimes",
+    "repeat_rate": 50, "churn_reason_known": "Partially / anecdotally", "retention_process": "Ad-hoc",
+    "founder_in_every_sale": "Most deals", "documented_sales_process": "Yes",
+    "self_diagnosis": "Scaling the team", "biggest_worry": "Hiring",
+}
+
 
 def test_empty_answers_yield_insufficient_never_a_guess():
     h = ce.compute_health({})
@@ -62,13 +81,13 @@ def test_opportunity_only_exists_with_revenue_evidence():
 
 
 def test_partial_dimension_gets_no_score():
-    # Answer only 2 of 5 conversion fields -> confidence 0.4 -> unscored
+    # Answer only 2 of 5 conversion fields -> confidence 0.4 -> unscored (Phase 1: requires 100%)
     partial = dict(FULL_ANSWERS)
     for k in ("conversion_close_rate", "conversion_followups", "conversion_owner"):
         partial.pop(k)
     h = ce.compute_health(partial)
     conv = next(d for d in h["dimensions"] if d["key"] == "conversion")
-    assert conv["confidence"] < 0.5
+    assert not ce._dimension_scorable(conv["confidence"])
     assert conv["score"] is None
     assert conv["missing"]
 
@@ -156,3 +175,43 @@ def test_recommendation_card_is_complete():
     for k in ("action", "why", "evidence", "confidence_pct", "assumptions", "expected_impact"):
         assert r.get(k) not in (None, "", []), f"missing {k}"
     assert ce.compute_recommendation({}) is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — Honesty patch (DIAGNOSTIC_REDESIGN_V3.md)
+# ---------------------------------------------------------------------------
+
+def test_phase1_troubled_profile_health_at_most_55():
+    h = ce.compute_health(FULL_ANSWERS)
+    assert h["sufficient"]
+    assert h["health_score"] <= 55
+    assert h["risk_level"] == "High Risk"
+    assert h["primary_constraint"]["key"] in ("conversion", "pricing", "qualification", "founder_dependency")
+
+
+def test_phase1_troubled_profile_no_silent_100s():
+    h = ce.compute_health(FULL_ANSWERS)
+    scored = [d for d in h["dimensions"] if d["score"] is not None]
+    assert not any(d["score"] == 100 for d in scored), "troubled profile must not show Healthy 100s"
+
+
+def test_phase1_soft_profile_not_false_negative():
+    h = ce.compute_health(SOFT_ANSWERS)
+    assert h["sufficient"]
+    assert h["health_score"] <= 70
+    watch_plus = sum(1 for d in h["dimensions"] if d["score"] is not None and d["score"] <= 75)
+    assert watch_plus >= 2
+
+
+def test_phase1_all_systems_structured_finding():
+    for dim_key in ce.DIMENSIONS:
+        sf = ce.build_system_finding(dim_key, FULL_ANSWERS)
+        for key in ("finding", "root_cause", "business_impact", "score_line", "recommended_action", "expected_outcome", "formatted"):
+            assert sf.get(key), f"missing {key} on {dim_key}"
+
+
+def test_phase1_chain_cap_and_compound_findings():
+    h = ce.compute_health(FULL_ANSWERS)
+    assert h["weakest_system_score"] < 55
+    assert h["health_score"] <= 55
+    assert isinstance(h.get("compound_findings"), list)
