@@ -48,6 +48,7 @@ TYPE_REGISTRY = {
     "audit_spec":        ("AUD", "audit_specs",       ["spec_version", "question_reforms"]),
     "compound_pattern":  ("CMP", "compound_patterns", ["definition", "systems", "trigger"]),
     "moat_spec":         ("MOA", "moat_specs",        ["pillars", "competitive_frame"]),
+    "outcome_protocol":  ("OUT", "outcome_protocols", ["protocol", "measurement_window_days"]),
 }
 
 RELATIONSHIP_TYPES = {

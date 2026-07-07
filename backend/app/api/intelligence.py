@@ -18,8 +18,13 @@ from backend.app.core import audit_modules as am
 from backend.app.bse.adapters.product import record_diagnosis_run, run_for_org
 from backend.app.core.twin_longitudinal import analyze_trajectory
 from backend.app.bse.projection import diagnosis_memory_payload
-from backend.app.models.intelligence import (RevenueAudit, DiagnosisSnapshot,
-    EvidenceDataset, EvidenceRecord, BenchmarkSample, MemoryEvent)
+from backend.app.models.intelligence import (
+    RevenueAudit, DiagnosisSnapshot, EvidenceDataset, EvidenceRecord,
+    BenchmarkSample, TreatmentOutcome, MemoryEvent,
+)
+from backend.app.knowledge_engine.outcome_tracking import (
+    record_outcome, list_outcomes, outcome_to_dict, summarize_outcomes, OUTCOME_PROTOCOL_ID,
+)
 from backend.app.models.auth import User, Organization
 from backend.app.api.deps import get_current_user
 
@@ -32,6 +37,12 @@ class AuditSave(BaseModel):
 
 class AnalystQuestion(BaseModel):
     question: str
+
+
+class OutcomeRecord(BaseModel):
+    constraint_key: str
+    status: str  # started | completed | abandoned
+    notes: str | None = None
 
 
 def remember(db: Session, org_id: int, event_type: str, summary: str, payload: dict = None):
@@ -377,13 +388,63 @@ def get_twin(db: Session = Depends(get_session), current_user: User = Depends(ge
 @router.get("/trajectory")
 def get_trajectory(db: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Longitudinal diagnosis analysis from DiagnosisSnapshot history."""
+    org_id = current_user.organization_id
     snaps = db.exec(
         select(DiagnosisSnapshot)
-        .where(DiagnosisSnapshot.organization_id == current_user.organization_id)
+        .where(DiagnosisSnapshot.organization_id == org_id)
         .order_by(DiagnosisSnapshot.created_at.desc())
         .limit(24)
     ).all()
-    return analyze_trajectory(snaps)
+    trajectory = analyze_trajectory(snaps)
+    outcomes = list_outcomes(db, org_id)
+    trajectory["outcome_tracking"] = summarize_outcomes(outcomes)
+    trajectory["recent_outcomes"] = [outcome_to_dict(o) for o in outcomes[:5]]
+    return trajectory
+
+
+@router.get("/outcomes")
+def get_outcomes(db: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    """AFK-OUT-0001 treatment outcome records for this organization."""
+    org_id = current_user.organization_id
+    rows = list_outcomes(db, org_id)
+    return {
+        "protocol_id": OUTCOME_PROTOCOL_ID,
+        "summary": summarize_outcomes(rows),
+        "outcomes": [outcome_to_dict(r) for r in rows],
+    }
+
+
+@router.post("/outcomes")
+def post_outcome(
+    data: OutcomeRecord,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Record treatment started/completed/abandoned — links to diagnosis baseline."""
+    org_id = current_user.organization_id
+    if data.constraint_key not in ce.DIMENSIONS:
+        raise HTTPException(status_code=422, detail=f"Unknown constraint: {data.constraint_key}")
+    if data.status not in ("started", "completed", "abandoned"):
+        raise HTTPException(status_code=422, detail="status must be started, completed, or abandoned")
+
+    org = db.get(Organization, org_id)
+    output = run_for_org(db, org_id, org.name if org else None)
+    health = output.clarity
+    if not health.get("sufficient"):
+        raise HTTPException(status_code=400, detail="Complete the Revenue Audit before recording treatment outcomes.")
+
+    try:
+        row = record_outcome(db, org_id, data.constraint_key, data.status, health, data.notes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    label = ce.DIMENSIONS[data.constraint_key]["label"]
+    remember(db, org_id, "treatment_outcome",
+             f"Treatment {data.status} for {label} — verdict {row.outcome_verdict}.",
+             {"constraint_key": data.constraint_key, "status": data.status,
+              "outcome_verdict": row.outcome_verdict, "protocol_id": OUTCOME_PROTOCOL_ID})
+
+    return {"saved": True, "outcome": outcome_to_dict(row)}
 
 
 @router.get("/health")

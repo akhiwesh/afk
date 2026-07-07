@@ -158,6 +158,26 @@ def _check_never_invent_ladder() -> dict:
     }
 
 
+def _check_outcome_tracking_infrastructure() -> dict:
+    from backend.app.knowledge_engine.outcome_tracking import OUTCOME_PROTOCOL_ID, record_outcome, summarize_outcomes
+    r = load_registry()
+    out = r.get(OUTCOME_PROTOCOL_ID)
+    passed = (
+        out is not None
+        and out.get("type") == "outcome_protocol"
+        and callable(record_outcome)
+        and callable(summarize_outcomes)
+    )
+    return {
+        "pillar_id": "outcome_tracking",
+        "passed": passed,
+        "evidence": {
+            "protocol_id": OUTCOME_PROTOCOL_ID,
+            "measurement_window_days": out.get("measurement_window_days") if out else None,
+        },
+    }
+
+
 _PILLAR_CHECKS = [
     _check_epistemic_honesty,
     _check_scientific_versioning,
@@ -166,6 +186,7 @@ _PILLAR_CHECKS = [
     _check_deterministic_diagnosis,
     _check_belief_evidence_split,
     _check_never_invent_ladder,
+    _check_outcome_tracking_infrastructure,
 ]
 
 

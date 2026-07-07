@@ -49,6 +49,11 @@ pillars:
   weight: 15
   competitor_gap: Competitors invent benchmarks and claim validation without corpus.
   verification: all KB objects at hypothesis until case studies justify promotion
+- id: outcome_tracking
+  name: Treatment outcome tracking (AFK-OUT-0001)
+  weight: 10
+  competitor_gap: AI tools recommend actions but never measure whether the constraint moved.
+  verification: outcome protocol in KB; TreatmentOutcome persistence; POST/GET /outcomes API
 todos:
 - 'TODO(research): industry-specific moat pillars after N>=10 calibrated cases.'
 created:

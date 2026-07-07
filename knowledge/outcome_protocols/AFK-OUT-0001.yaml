@@ -1,0 +1,44 @@
+id: AFK-OUT-0001
+type: outcome_protocol
+name: Treatment outcome tracking v1
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: >-
+  Protocol for linking founder-reported treatment actions to longitudinal diagnosis
+  snapshots. Outcomes are measured on dimension score delta — not revenue claims —
+  until external outcome observations exist.
+measurement_window_days: 30
+protocol:
+  record_events:
+  - started
+  - completed
+  - abandoned
+  baseline_capture: diagnosis_at_record_time
+  followup_capture: latest_diagnosis_snapshot_on_complete
+  verdict_rules:
+    improved: followup_dimension_score > baseline_dimension_score
+    unchanged: followup_dimension_score == baseline_dimension_score
+    declined: followup_dimension_score < baseline_dimension_score
+    insufficient_data: fewer_than_two_snapshots_or_missing_baseline
+  honest_limits:
+  - Does not claim revenue uplift until invoice evidence confirms
+  - Founder self-report of treatment start is hypothesis — not validated efficacy
+relationships:
+- type: informs
+  target: AFK-VAL-0001
+  confidence: hypothesized
+- type: monitors
+  target: AFK-TRT-0001
+  confidence: hypothesized
+todos:
+- 'TODO(validation): correlate outcome verdicts with case studies after N>=10 corpus.'
+created:
+  by: AFK Research Loop #11
+  date: '2026-07-07'
+  reason: 'Close outcome-tracking gap identified in Loop #10 moat honest limits'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #11
+  reason: 'Close outcome-tracking gap identified in Loop #10 moat honest limits'

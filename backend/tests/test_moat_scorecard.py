@@ -9,8 +9,8 @@ def test_moat_spec_in_registry():
 def test_moat_scorecard_all_pillars_pass():
     card = compute_moat_scorecard()
     assert card["moat_spec_id"] == MOAT_SPEC_ID
-    assert card["pillars_total"] == 7
-    assert card["pillars_passed"] == 7
+    assert card["pillars_total"] == 8
+    assert card["pillars_passed"] == 8
     assert card["moat_score"] == 100.0
     assert card["competitive_frame"]
 

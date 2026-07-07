@@ -6,12 +6,13 @@ import { API } from "../api.js";
 export async function renderTwin(container) {
   container.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:50vh;"><span style="color:hsl(var(--text-muted));font-size:0.9rem;">Loading business twin…</span></div>`;
 
-  let t, timeline = [], trajectory = null;
+  let t, timeline = [], trajectory = null, outcomes = null;
   try {
-    [t, timeline, trajectory] = await Promise.all([
+    [t, timeline, trajectory, outcomes] = await Promise.all([
       API.get("/intelligence/twin"),
       API.get("/intelligence/memory/timeline"),
       API.get("/intelligence/trajectory").catch(() => null),
+      API.get("/intelligence/outcomes").catch(() => null),
     ]);
   }
   catch (e) {
@@ -98,6 +99,16 @@ export async function renderTwin(container) {
           <ul style="margin-left:1.1rem;line-height:1.6;">${list(t.strengths, "None confirmed yet — needs more evidence.")}</ul>
         </div>
       </div>
+      ${outcomes?.summary?.total ? `
+      <div style="padding:1.5rem;border:1px solid hsl(var(--border));border-radius:10px;margin-bottom:2rem;">
+        <div style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.6rem;">Treatment outcomes · ${outcomes.protocol_id || "AFK-OUT-0001"}</div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+          <div><span style="font-size:1.3rem;font-weight:650;">${outcomes.summary.improved}</span><div style="font-size:0.72rem;color:hsl(var(--text-muted));">improved</div></div>
+          <div><span style="font-size:1.3rem;font-weight:650;">${outcomes.summary.active}</span><div style="font-size:0.72rem;color:hsl(var(--text-muted));">in progress</div></div>
+          <div><span style="font-size:1.3rem;font-weight:650;">${outcomes.summary.completed}</span><div style="font-size:0.72rem;color:hsl(var(--text-muted));">completed</div></div>
+        </div>
+        <p style="font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.55;">${outcomes.summary.note || "Dimension score delta — not revenue claims."}</p>
+      </div>` : ""}
       ${trajectory?.sufficient ? `
       <div style="padding:1.5rem;border:1px solid hsl(var(--border));border-radius:10px;margin-bottom:2rem;">
         <div style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.6rem;">Diagnosis trajectory</div>

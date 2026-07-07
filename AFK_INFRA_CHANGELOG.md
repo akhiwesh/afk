@@ -127,6 +127,14 @@
 **Shipped:** `feature/diagnostic-v3-phase1-honesty` pushed to `github.com/akhiwesh/afk` (loops 6–9 commit)
 **PR:** https://github.com/akhiwesh/afk/pull/new/feature/diagnostic-v3-phase1-honesty
 
+## INF-24 — Treatment outcome tracking (Loop #11)
+**Shipped:** `AFK-OUT-0001`; `TreatmentOutcome` model; `POST/GET /outcomes`; trajectory outcome summary
+**Rejected:** Revenue uplift claims without invoice evidence
+
+## INF-25 — Moat pillar #8 outcome tracking (Loop #11)
+**Shipped:** `outcome_tracking` pillar in AFK-MOA-0001; moat scorecard 8/8 when infrastructure present
+**Rejected:** Auto-marking treatments complete without founder action
+
 ---
 
 ## Pending (requires external evidence)

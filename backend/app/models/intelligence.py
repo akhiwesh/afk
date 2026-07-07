@@ -70,6 +70,22 @@ class BenchmarkSample(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class TreatmentOutcome(SQLModel, table=True):
+    """Founder-reported treatment application linked to diagnosis baselines."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    constraint_key: str = Field(index=True)
+    treatment_id: Optional[str] = None
+    status: str = Field(default="started")  # started | completed | abandoned
+    baseline_health_score: int
+    baseline_dimension_score: Optional[int] = None
+    followup_dimension_score: Optional[int] = None
+    outcome_verdict: str = Field(default="pending")  # pending | improved | unchanged | declined | insufficient_data
+    notes: Optional[str] = None
+    recorded_at: datetime = Field(default_factory=utcnow)
+    completed_at: Optional[datetime] = None
+
+
 class MemoryEvent(SQLModel, table=True):
     """Business Memory: one append-only event in an organization's history.
     The longitudinal substrate for the Timeline and the future Reasoning

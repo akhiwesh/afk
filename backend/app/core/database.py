@@ -24,7 +24,10 @@ def init_db() -> None:
     from backend.app.models.automation import Workflow, WorkflowExecutionLog
     from backend.app.models.finance import Invoice
     from backend.app.models.admin import AuditLog
-    from backend.app.models.intelligence import RevenueAudit, DiagnosisSnapshot, EvidenceDataset, EvidenceRecord, BenchmarkSample, MemoryEvent
+    from backend.app.models.intelligence import (
+        RevenueAudit, DiagnosisSnapshot, EvidenceDataset, EvidenceRecord,
+        BenchmarkSample, TreatmentOutcome, MemoryEvent,
+    )
     
     SQLModel.metadata.create_all(engine)
 

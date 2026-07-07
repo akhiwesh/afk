@@ -8,6 +8,7 @@ from typing import Generator
 
 from backend.app.main import app
 from backend.app.core.database import get_session
+from backend.app.models.intelligence import TreatmentOutcome  # noqa: F401 — register table
 
 engine = create_engine(
     "sqlite:///:memory:",
