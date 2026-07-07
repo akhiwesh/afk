@@ -31,14 +31,14 @@
 }
 
 [data-theme="dark"] {
-  /* HSL Tailored Dark Theme (Stripe/Linear aesthetics) */
+  /* HSL Tailored Dark Theme (Stripe/Linear/Mercury — WCAG AA nav contrast) */
   --bg-app: 240 10% 4%;
-  --bg-card: 240 10% 6%;
-  --bg-sidebar: 240 10% 5%;
+  --bg-card: 240 8% 9%;
+  --bg-sidebar: 240 8% 6%;
   --text-primary: 0 0% 98%;
-  --text-secondary: 240 5% 70%;
-  --text-muted: 240 5% 45%;
-  --border: 240 6% 14%;
+  --text-secondary: 240 6% 78%;
+  --text-muted: 240 5% 58%;
+  --border: 240 6% 18%;
   --border-focus: 217.2 91.2% 59.8%;
   --primary: 217.2 91.2% 59.8%;
   --primary-foreground: 222.2 47.4% 11.2%;

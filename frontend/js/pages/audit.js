@@ -64,13 +64,13 @@ function fieldHtml(q, answers, qIndex) {
   } else if (q.type === "number") {
     control = `<div style="display:flex;align-items:center;gap:0.5rem;">
       <input class="diag-number" type="number" data-q="${q.id}" value="${v}" placeholder="e.g. 45" min="0">
-      <span style="font-size:0.85rem;color:#94a3b8;">${q.unit || "days"}</span>
+      <span class="diag-muted" style="font-size:0.85rem;">${q.unit || "days"}</span>
     </div>`;
   } else {
     control = `<textarea class="diag-textarea" data-q="${q.id}" rows="2" placeholder="In your own words…">${v}</textarea>`;
   }
 
-  const optional = q.optional ? ` <span style="font-size:0.72rem;color:#94a3b8;font-weight:400;">(optional)</span>` : "";
+  const optional = q.optional ? ` <span class="diag-muted" style="font-size:0.72rem;font-weight:400;">(optional)</span>` : "";
   return `
     <div class="diag-qcard">
       <div class="diag-qhead">
@@ -200,7 +200,7 @@ function renderDiagnosisPreview(preview) {
       ${renderGauge(preview.primary_score)}
       <div style="text-align:center;margin-bottom:1rem;">
         <div style="font-weight:600;">${preview.primary_constraint}</div>
-        <div style="font-size:0.78rem;color:#64748b;">Health ${preview.health_score}/100</div>
+        <div class="diag-muted" style="font-size:0.82rem;">Health ${preview.health_score}/100</div>
       </div>
       ${hv ? `<p class="diag-section-body"><strong>${hv.verdict}</strong> — ${hv.explanation}</p>` : ""}
       ${(preview.compound_findings || []).length ? `
@@ -219,7 +219,7 @@ async function runAnalysisSequence(container) {
   for (const label of steps) {
     const row = document.createElement("div");
     row.style.cssText = "display:flex;align-items:center;gap:0.75rem;";
-    row.innerHTML = `<span style="width:16px;height:16px;border:2px solid #b45309;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span><span style="color:#94a3b8;">${label}</span>`;
+    row.innerHTML = `<span style="width:16px;height:16px;border:2px solid #9a3412;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span><span class="diag-muted">${label}</span>`;
     seq.appendChild(row);
     await wait(550);
     row.innerHTML = `<span style="color:#4c7a4a;font-weight:700;">✓</span><span>${label}</span>`;
@@ -227,12 +227,12 @@ async function runAnalysisSequence(container) {
   await wait(400);
   seq.insertAdjacentHTML("beforeend", `<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <h2 style="font-family:'Lora',Georgia,serif;font-size:1.35rem;margin-top:1rem;">Your Business Twin is ready.</h2>
-    <p style="color:#94a3b8;">Opening Executive Diagnosis…</p>`);
+    <p class="diag-muted">Opening Executive Diagnosis…</p>`);
   await wait(1200);
 }
 
 export async function renderAudit(container, startModuleId = null) {
-  container.innerHTML = `<div class="diag-page"><div class="diag-inner" style="padding:3rem 0;text-align:center;color:#94a3b8;">Loading diagnostic…</div></div>`;
+  container.innerHTML = `<div class="diag-page"><div class="diag-inner" style="padding:3rem 0;text-align:center;"><span class="diag-muted">Loading diagnostic…</span></div></div>`;
 
   let state;
   try {
@@ -286,7 +286,7 @@ export async function renderAudit(container, startModuleId = null) {
           </div>
 
           <div class="diag-progress"><div style="width:${pct}%;"></div></div>
-          <p style="font-size:0.78rem;color:#94a3b8;margin:0 0 1rem;">${state.systems_complete} of ${state.systems_total} systems examined</p>
+          <p class="diag-muted" style="font-size:0.82rem;margin:0 0 1rem;">${state.systems_complete} of ${state.systems_total} systems examined</p>
 
           <div class="diag-stepper">${stepper}</div>
 
@@ -305,7 +305,7 @@ export async function renderAudit(container, startModuleId = null) {
               <button type="button" class="diag-btn-primary" id="audit-save">${idx < state.modules.length - 1 ? "Save & see finding" : "Finish & diagnose"}</button>
               ${idx > 0 ? `<button type="button" class="diag-btn-secondary" id="audit-back">← Previous</button>` : ""}
             `}
-            <span style="font-size:0.78rem;color:#94a3b8;">${mod.progress.answered}/${mod.progress.total} answered</span>
+            <span class="diag-muted" style="font-size:0.82rem;">${mod.progress.answered}/${mod.progress.total} answered</span>
           </div>
         </div>
       </div>`;

@@ -111,7 +111,8 @@
 
 .sidebar-item.active {
   color: hsl(var(--text-primary));
-  background-color: hsl(var(--border) / 0.6);
+  background-color: hsl(var(--border) / 0.75);
+  font-weight: 600;
 }
 
 .sidebar-footer {

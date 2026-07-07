@@ -9,42 +9,49 @@ export function scoreStatus(score) {
 }
 
 export function dimScoreColor(score) {
-  if (score == null) return "#e2e8f0";
-  if (score >= 75) return ZONE_HEX.emerald;
-  if (score >= 55) return ZONE_HEX.amber;
-  return ZONE_HEX.rose;
+  if (score == null) return "#cbd5e1";
+  if (score >= 75) return "#166534";
+  if (score >= 55) return "#a16207";
+  return "#9f2d1f";
 }
 
 export function sectionLabel(text) {
   return `<p class="diag-section-label">${text}</p>`;
 }
 
+const GAUGE_ZONE = {
+  rose: "#9f2d1f",
+  amber: "#a16207",
+  sky: "#1e4a5f",
+  emerald: "#166534",
+};
+
 export function renderGauge(score) {
   if (score == null) return "";
   const st = scoreStatus(score);
   const needleAngle = (score - 50) * 1.8;
-  const zoneHex = ZONE_HEX[st.colorKey] || ZONE_HEX.sky;
+  const zoneHex = GAUGE_ZONE[st.colorKey] || GAUGE_ZONE.sky;
   return `
-    <div style="max-width:260px;margin:0 auto;">
-      <svg viewBox="0 0 200 160" style="width:100%;">
-        <path d="M 22,110 A 78 78 0 0 1 112.2,32.96" fill="none" stroke="${ZONE_HEX.rose}" stroke-width="14"/>
-        <path d="M 112.2,32.96 A 78 78 0 0 1 145.85,46.9" fill="none" stroke="${ZONE_HEX.amber}" stroke-width="14"/>
-        <path d="M 145.85,46.9 A 78 78 0 0 1 169.5,74.59" fill="none" stroke="${ZONE_HEX.sky}" stroke-width="14"/>
-        <path d="M 169.5,74.59 A 78 78 0 0 1 178,110" fill="none" stroke="${ZONE_HEX.emerald}" stroke-width="14"/>
-        <text x="16" y="123" font-size="9" fill="#94a3b8">0</text>
-        <text x="184" y="123" font-size="9" fill="#94a3b8" text-anchor="end">100</text>
-        <g transform="rotate(${needleAngle} 100 110)"><polygon points="96,110 104,110 100,36" fill="#8a5a2b"/></g>
-        <circle cx="100" cy="110" r="8" fill="#57381b" stroke="#F1EEE4" stroke-width="2"/>
+    <div class="diag-gauge-wrap">
+      <svg viewBox="0 0 200 160" style="width:100%;" role="img" aria-label="Health score ${score} out of 100, ${st.label}">
+        <path d="M 22,110 A 78 78 0 0 1 112.2,32.96" fill="none" stroke="${GAUGE_ZONE.rose}" stroke-width="14"/>
+        <path d="M 112.2,32.96 A 78 78 0 0 1 145.85,46.9" fill="none" stroke="${GAUGE_ZONE.amber}" stroke-width="14"/>
+        <path d="M 145.85,46.9 A 78 78 0 0 1 169.5,74.59" fill="none" stroke="${GAUGE_ZONE.sky}" stroke-width="14"/>
+        <path d="M 169.5,74.59 A 78 78 0 0 1 178,110" fill="none" stroke="${GAUGE_ZONE.emerald}" stroke-width="14"/>
+        <text x="16" y="123" font-size="10" font-weight="600" fill="#475569">0</text>
+        <text x="184" y="123" font-size="10" font-weight="600" fill="#475569" text-anchor="end">100</text>
+        <g transform="rotate(${needleAngle} 100 110)"><polygon points="96,110 104,110 100,36" fill="#7c2d12"/></g>
+        <circle cx="100" cy="110" r="8" fill="#431407" stroke="#ffffff" stroke-width="2"/>
       </svg>
-      <div style="text-align:center;margin-top:-1rem;">
-        <div style="font-family:ui-monospace,monospace;font-size:2.25rem;font-weight:700;">${score}<span style="font-size:1rem;font-weight:400;color:#94a3b8;">/100</span></div>
-        <div style="font-family:'Lora',Georgia,serif;font-weight:600;color:${zoneHex};">${st.label}</div>
+      <div class="diag-gauge-score">
+        <div class="diag-gauge-num">${score}<span class="diag-gauge-denom">/100</span></div>
+        <div class="diag-gauge-status" style="color:${zoneHex};">${st.label}</div>
       </div>
       <div class="diag-gauge-legend">
-        <span style="color:${ZONE_HEX.rose};">CRITICAL</span>
-        <span style="color:${ZONE_HEX.amber};">PRESSURE</span>
-        <span style="color:${ZONE_HEX.sky};">MODERATE</span>
-        <span style="color:${ZONE_HEX.emerald};">HEALTHY</span>
+        <span style="color:${GAUGE_ZONE.rose};">CRITICAL</span>
+        <span style="color:${GAUGE_ZONE.amber};">PRESSURE</span>
+        <span style="color:${GAUGE_ZONE.sky};">MODERATE</span>
+        <span style="color:${GAUGE_ZONE.emerald};">HEALTHY</span>
       </div>
     </div>`;
 }
