@@ -691,6 +691,27 @@
   letter-spacing: 0.06em;
 }
 
+.diag-treatment-block {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--diag-border-subtle);
+}
+
+.diag-treatment-status {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.diag-treatment-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
 /* Dark app shell: diagnostic canvas stays light (Mercury/Stripe report pattern) */
 [data-theme="dark"] .diag-page {
   background: var(--diag-canvas);

@@ -4,12 +4,84 @@ import { renderGauge, ruleIdChip, scoreStatus, dimScoreColor, sectionLabel } fro
 
 const fmtINR = (n) => "₹" + Number(n).toLocaleString("en-IN");
 
+function treatmentTrackingBlock(pc, outcomesData) {
+  if (!pc?.key) return "";
+  const protocol = outcomesData?.protocol_id || "AFK-OUT-0001";
+  const active = (outcomesData?.outcomes || []).find(
+    (o) => o.constraint_key === pc.key && o.status === "started",
+  );
+
+  if (active) {
+    const since = new Date(active.recorded_at).toLocaleDateString("en-IN", {
+      day: "numeric", month: "short", year: "numeric",
+    });
+    return `
+      <div class="diag-treatment-block">
+        ${sectionLabel(`Treatment tracking · ${protocol}`)}
+        <div class="diag-treatment-status">
+          <span class="diag-status-pill is-moderate">In progress</span>
+          <span class="diag-muted-sm">Started ${since} · baseline ${active.baseline_dimension_score ?? "—"}/100</span>
+          ${active.treatment_id ? ruleIdChip(active.treatment_id) : ""}
+        </div>
+        <p class="diag-muted-sm">AFK compares your dimension score on the next diagnosis — not revenue claims until evidence confirms.</p>
+        <div class="diag-treatment-actions">
+          <button type="button" class="diag-btn-primary" data-treatment-action="completed" data-constraint-key="${pc.key}">Mark complete</button>
+          <button type="button" class="diag-btn-secondary" data-treatment-action="abandoned" data-constraint-key="${pc.key}">Abandoned</button>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="diag-treatment-block">
+      ${sectionLabel(`Treatment tracking · ${protocol}`)}
+      <p class="diag-muted-sm">Record that you've begun the recommended action. AFK tracks dimension score change over time.</p>
+      <button type="button" class="diag-btn-primary" data-treatment-action="started" data-constraint-key="${pc.key}">Start this treatment</button>
+    </div>`;
+}
+
+function wireTreatmentHandlers(container) {
+  container.querySelectorAll("[data-treatment-action]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const status = btn.dataset.treatmentAction;
+      const constraintKey = btn.dataset.constraintKey;
+      const labels = { started: "Starting…", completed: "Saving…", abandoned: "Saving…" };
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = labels[status] || "Saving…";
+      container.querySelectorAll("[data-treatment-action]").forEach((b) => { b.disabled = true; });
+      try {
+        const res = await API.post("/intelligence/outcomes", {
+          constraint_key: constraintKey,
+          status,
+        });
+        const verdict = res.outcome?.outcome_verdict;
+        const msg = status === "started"
+          ? "Treatment started — AFK is tracking progress."
+          : status === "completed"
+            ? `Treatment complete — verdict: ${verdict || "recorded"}.`
+            : "Treatment marked abandoned.";
+        UI.toast(msg, "success");
+        await renderHealth(container);
+      } catch (e) {
+        UI.toast(e.message || "Could not record treatment.", "error");
+        container.querySelectorAll("[data-treatment-action]").forEach((b) => {
+          b.disabled = false;
+          if (b === btn) b.textContent = original;
+        });
+      }
+    });
+  });
+}
+
 export async function renderHealth(container) {
   container.innerHTML = `<div class="diag-page diag-page--embedded"><div class="diag-health-inner" style="padding:3rem 0;text-align:center;"><span class="diag-muted">Computing diagnosis from your evidence…</span></div></div>`;
 
-  let h, moat;
+  let h, moat, outcomes;
   try {
-    h = await API.get("/intelligence/health");
+    [h, outcomes] = await Promise.all([
+      API.get("/intelligence/health"),
+      API.get("/intelligence/outcomes").catch(() => null),
+    ]);
     try { moat = await API.get("/knowledge/moat"); } catch { moat = null; }
   } catch (e) {
     container.innerHTML = `<div class="diag-page diag-page--embedded"><div class="diag-health-inner"><div class="diag-panel">Could not load diagnosis: ${e.message}</div></div></div>`;
@@ -95,6 +167,7 @@ export async function renderHealth(container) {
         <div><div class="diag-section-label">Expected impact</div><div class="diag-stat-val is-sm">${rec.expected_impact}</div></div>
       </div>
       <div style="margin-top:1rem;"><div class="diag-section-label">Assumptions</div><div class="diag-muted-sm" style="max-width:70ch;">${rec.assumptions}</div></div>
+      ${treatmentTrackingBlock(pc, outcomes)}
     </div>` : "";
 
   const openQs = (h.open_questions || []).length ? `
@@ -338,6 +411,8 @@ export async function renderHealth(container) {
       </div>
     </div>
     </div>`;
+
+  wireTreatmentHandlers(container);
 
   container.querySelector("#health-export-pdf")?.addEventListener("click", async () => {
     const btn = container.querySelector("#health-export-pdf");
