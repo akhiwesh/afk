@@ -101,6 +101,38 @@ export const API = {
     return this.request(endpoint, { method: "DELETE" });
   },
 
+  async download(endpoint, fallbackFilename = "download") {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = {};
+    const token = localStorage.getItem("access_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(url, { headers });
+    if (response.status === 401 && endpoint !== "/auth/login") {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user_profile");
+      window.dispatchEvent(new Event("auth-changed"));
+    }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = formatApiDetail(errorData.detail)
+        || `Download failed with status ${response.status}`;
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const disp = response.headers.get("Content-Disposition") || "";
+    const match = disp.match(/filename="?([^";]+)"?/i);
+    const filename = match ? match[1] : fallbackFilename;
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+    return filename;
+  },
+
   isAuthenticated() {
     return !!localStorage.getItem("access_token");
   },

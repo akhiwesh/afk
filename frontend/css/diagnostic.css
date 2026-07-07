@@ -65,6 +65,18 @@
   line-height: 1.55;
 }
 
+.diag-hero .diag-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #64748b;
+  color: #f8fafc;
+}
+
+.diag-hero .diag-btn-secondary:hover {
+  border-color: #fbbf24;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .diag-tags {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,5 @@
 import { API } from "../api.js";
+import { UI } from "../ui.js";
 import { renderGauge, ruleIdChip, scoreStatus, dimScoreColor, sectionLabel } from "../diagnostic-ui.js";
 
 const fmtINR = (n) => "₹" + Number(n).toLocaleString("en-IN");
@@ -219,9 +220,16 @@ export async function renderHealth(container) {
     <div class="diag-page diag-page--embedded">
     <div class="diag-health-inner">
       <div class="diag-hero" style="margin-bottom:1.5rem;">
-        <p class="diag-hero-kicker">Executive Diagnosis</p>
-        <h1>Revenue Health</h1>
-        <p>${h.risk_level} · primary constraint ${pc.label}</p>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+          <div>
+            <p class="diag-hero-kicker">Executive Diagnosis</p>
+            <h1>Revenue Health</h1>
+            <p>${h.risk_level} · primary constraint ${pc.label}</p>
+          </div>
+          <button type="button" class="diag-btn-secondary" id="health-export-pdf" style="margin-top:0.25rem;flex-shrink:0;">
+            Download PDF
+          </button>
+        </div>
       </div>
 
       <div class="diag-hero-score">
@@ -330,4 +338,20 @@ export async function renderHealth(container) {
       </div>
     </div>
     </div>`;
+
+  container.querySelector("#health-export-pdf")?.addEventListener("click", async () => {
+    const btn = container.querySelector("#health-export-pdf");
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Generating…";
+    try {
+      const filename = await API.download("/intelligence/health/export.pdf");
+      UI.toast(`Downloaded ${filename}`, "success");
+    } catch (e) {
+      UI.toast(e.message || "Could not export PDF.", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  });
 }

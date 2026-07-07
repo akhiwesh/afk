@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -16,6 +17,7 @@ from backend.app.core import engine as ce
 from backend.app.core import evidence_intel as evi
 from backend.app.core import audit_modules as am
 from backend.app.bse.adapters.product import record_diagnosis_run, run_for_org
+from backend.app.core.diagnostic_export import build_diagnostic_pdf, export_filename
 from backend.app.core.twin_longitudinal import analyze_trajectory
 from backend.app.bse.projection import diagnosis_memory_payload
 from backend.app.models.intelligence import (
@@ -453,6 +455,30 @@ def get_health(db: Session = Depends(get_session), current_user: User = Depends(
     output = run_for_org(db, current_user.organization_id, org.name if org else None)
     health = dict(output.clarity)
     return _attach_snapshot_changes(db, current_user.organization_id, health)
+
+
+@router.get("/health/export.pdf")
+def export_health_pdf(db: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    """Download executive diagnosis as a shareable PDF memo."""
+    org = db.get(Organization, current_user.organization_id)
+    org_name = org.name if org else None
+    output = run_for_org(db, current_user.organization_id, org_name)
+    health = _attach_snapshot_changes(db, current_user.organization_id, dict(output.clarity))
+    try:
+        pdf_bytes = build_diagnostic_pdf(health, org_name=org_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    filename = export_filename(org_name)
+    remember(db, current_user.organization_id, "diagnosis_exported",
+             f"Executive diagnosis PDF exported ({filename}).",
+             {"filename": filename, "health_score": health.get("health_score")})
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/memory/timeline")
