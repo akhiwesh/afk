@@ -16,6 +16,7 @@ from backend.app.core import engine as ce
 from backend.app.core import evidence_intel as evi
 from backend.app.core import audit_modules as am
 from backend.app.bse.adapters.product import record_diagnosis_run, run_for_org
+from backend.app.core.twin_longitudinal import analyze_trajectory
 from backend.app.bse.projection import diagnosis_memory_payload
 from backend.app.models.intelligence import (RevenueAudit, DiagnosisSnapshot,
     EvidenceDataset, EvidenceRecord, BenchmarkSample, MemoryEvent)
@@ -225,14 +226,23 @@ def _finalize_audit_diagnosis(db: Session, org_id: int, merged: dict) -> dict:
 
 @router.get("/audit/questions")
 def get_questions(current_user: User = Depends(get_current_user)):
-    return {"sections": ce.AUDIT_SECTIONS, "questions": ce.QUESTIONS}
+    return {
+        "sections": ce.AUDIT_SECTIONS,
+        "questions": ce.QUESTIONS,
+        "optional_questions": ce.OPTIONAL_QUESTIONS,
+        "question_metadata": ce.QUESTION_METADATA,
+        "audit_spec_id": "AFK-AUD-0001",
+    }
 
 
 @router.get("/audit/modules")
 def get_audit_modules(db: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Sectional audit wizard — Business System blocks with per-module progress."""
-    answers = _get_answers(db, current_user.organization_id)
-    state = am.list_modules_state(answers)
+    org_id = current_user.organization_id
+    answers = _get_answers(db, org_id)
+    bundle = _evidence_bundle(db, org_id)
+    metrics = evi.compute_metrics(bundle["records_by_kind"]) if bundle["kind_counts"] else None
+    state = am.list_modules_state(answers, metrics)
     state["answers"] = answers
     state["answered"] = sum(1 for q in ce.QUESTIONS if answers.get(q["id"]) not in (None, ""))
     state["total"] = len(ce.QUESTIONS)
@@ -248,9 +258,12 @@ def get_audit_module(
     module = am.get_module(module_id)
     if not module:
         raise HTTPException(status_code=404, detail="Unknown audit module")
-    answers = _get_answers(db, current_user.organization_id)
+    org_id = current_user.organization_id
+    answers = _get_answers(db, org_id)
+    bundle = _evidence_bundle(db, org_id)
+    metrics = evi.compute_metrics(bundle["records_by_kind"]) if bundle["kind_counts"] else None
     progress = am.module_progress(module, answers)
-    payoff = am.compute_module_payoff(module_id, answers) if progress["complete"] else None
+    payoff = am.compute_module_payoff(module_id, answers, metrics) if progress["complete"] else None
     return {
         "module": {
             "id": module_id,
@@ -276,7 +289,7 @@ def save_audit_module(
     module = am.get_module(module_id)
     if not module:
         raise HTTPException(status_code=404, detail="Unknown audit module")
-    allowed = set(am.module_question_ids(module))
+    allowed = set(am.module_save_question_ids(module))
     submitted = set(data.answers)
     bad = submitted - allowed
     if bad:
@@ -287,8 +300,10 @@ def save_audit_module(
 
     org_id = current_user.organization_id
     merged = _merge_audit_answers(db, org_id, data.answers)
+    bundle = _evidence_bundle(db, org_id)
+    metrics = evi.compute_metrics(bundle["records_by_kind"]) if bundle["kind_counts"] else None
     progress = am.module_progress(module, merged)
-    payoff = am.compute_module_payoff(module_id, merged)
+    payoff = am.compute_module_payoff(module_id, merged, metrics)
 
     remember(db, org_id, "audit_module_saved",
              f"{module['title']} examined — {progress['answered']}/{progress['total']} answered.",
@@ -303,7 +318,7 @@ def save_audit_module(
         if health.get("sufficient"):
             record_diagnosis_run(db, org_id, pipeline)
 
-    modules_state = am.list_modules_state(merged)
+    modules_state = am.list_modules_state(merged, metrics)
     mod_list = modules_state["modules"]
     idx = next(i for i, m in enumerate(mod_list) if m["id"] == module_id)
     next_module = mod_list[idx + 1]["id"] if idx + 1 < len(mod_list) else None
@@ -357,6 +372,18 @@ def get_twin(db: Session = Depends(get_session), current_user: User = Depends(ge
     org = db.get(Organization, current_user.organization_id)
     output = run_for_org(db, current_user.organization_id, org.name if org else None)
     return output.twin
+
+
+@router.get("/trajectory")
+def get_trajectory(db: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    """Longitudinal diagnosis analysis from DiagnosisSnapshot history."""
+    snaps = db.exec(
+        select(DiagnosisSnapshot)
+        .where(DiagnosisSnapshot.organization_id == current_user.organization_id)
+        .order_by(DiagnosisSnapshot.created_at.desc())
+        .limit(24)
+    ).all()
+    return analyze_trajectory(snaps)
 
 
 @router.get("/health")

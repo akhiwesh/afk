@@ -1,0 +1,70 @@
+id: AFK-PRI-0001
+type: priority_model
+name: Impact-weighted constraint priority v1
+version: 1.2.0
+status: hypothesis
+owner: chief_business_scientist
+description: Deterministic primary-constraint selection — ranks revenue systems by commercial leverage,
+  not raw dimension score alone (DIAGNOSTIC_REDESIGN_V3 §8).
+formula: 'priority_score = (100 − dimension_score) / 100 × uplift_heuristic × fixability_factor × time_impact_factor;
+  primary_constraint = argmax(priority_score), tie-break on lower dimension_score'
+rationale: A moderately weak conversion system on paid leads often outranks a worse qualification score
+  because revenue exposure and fixability are higher — Bain-style impact framing without claiming empirical
+  calibration.
+factors:
+  severity:
+    computation: (100 − dimension_score) / 100
+    provenance: engine dimension scores (Phase 1 rule penalties)
+  revenue_exposure:
+    computation: treatment uplift_heuristic_fraction_of_annual_revenue from AFK-TRT-*
+    provenance: operator_judgment — displayed as directional, not benchmark
+  fixability:
+    computation: 'high=1.0, medium=0.85, low=0.70 from treatment metadata'
+    provenance: operator_judgment pending Treatment Methodology research
+  time_to_impact:
+    computation: '30d=1.0, 60d=0.9, 90d=0.8 from treatment metadata'
+    provenance: operator_judgment pending outcome observations
+relationships:
+- type: informs
+  target: AFK-CFM-0001
+  confidence: hypothesized
+- type: requires
+  target: AFK-TRT-0001
+  confidence: hypothesized
+evidence_adjunct:
+  pricing_discount_exposure:
+    trigger_metric: avg_discount_pct
+    threshold_pct: 5.0
+    slope: 2.0
+    cap: 2.0
+    formula: 'exposure_multiplier = 1 + min(cap, (avg_discount_pct − threshold) / slope) when metric from uploaded invoices'
+    provenance: operator_judgment slope calibrated against AFK-CAS-0001 at 6.1% discount (N=1)
+    applies_only_when: uploaded invoice evidence present — never from self-report alone
+  retention_repeat_exposure:
+    trigger_metric: repeat_customer_rate
+    gap_pp: 20.0
+    slope: 3.0
+    cap: 1.75
+    formula: 'exposure_multiplier = 1 + min(cap−1, gap_pp / slope) when |stated_repeat − measured_repeat| ≥ gap_pp'
+    provenance: operator_judgment — fires on belief/evidence contradiction only
+    applies_only_when: both questionnaire repeat_rate and uploaded repeat_customer_rate present
+todos:
+- 'TODO(validation): calibrate slope/threshold against AFK-CAS-* expert agreement — N=1 today.'
+- 'TODO(research): separate funnel_position_weight from uplift_heuristic when physiology graph ships.'
+created:
+  by: Chief Business Scientist (Research Loop #3)
+  date: '2026-07-07'
+  reason: 'Compile impact-priority logic into versioned KB object with provenance per AFK principles'
+changelog:
+- version: 1.2.0
+  date: '2026-07-07'
+  by: Chief Business Scientist
+  reason: Retention repeat-rate contradiction adjunct + explicit slope/cap constants for kb_runtime
+- version: 1.1.0
+  date: '2026-07-07'
+  by: Chief Business Scientist
+  reason: Evidence-conditioned pricing exposure boost from invoice avg_discount_pct (Loop #5)
+- version: 1.0.0
+  date: '2026-07-07'
+  by: Chief Business Scientist
+  reason: Initial extraction from engine._CONSTRAINT_PLAYBOOK + compute_constraint_priority

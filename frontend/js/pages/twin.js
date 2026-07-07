@@ -6,8 +6,14 @@ import { API } from "../api.js";
 export async function renderTwin(container) {
   container.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:50vh;"><span style="color:hsl(var(--text-muted));font-size:0.9rem;">Loading business twin…</span></div>`;
 
-  let t, timeline = [];
-  try { [t, timeline] = await Promise.all([API.get("/intelligence/twin"), API.get("/intelligence/memory/timeline")]); }
+  let t, timeline = [], trajectory = null;
+  try {
+    [t, timeline, trajectory] = await Promise.all([
+      API.get("/intelligence/twin"),
+      API.get("/intelligence/memory/timeline"),
+      API.get("/intelligence/trajectory").catch(() => null),
+    ]);
+  }
   catch (e) {
     container.innerHTML = `<div class="card" style="max-width:640px;margin:3rem auto;">Could not load twin: ${e.message}</div>`;
     return;
@@ -92,6 +98,16 @@ export async function renderTwin(container) {
           <ul style="margin-left:1.1rem;line-height:1.6;">${list(t.strengths, "None confirmed yet — needs more evidence.")}</ul>
         </div>
       </div>
+      ${trajectory?.sufficient ? `
+      <div style="padding:1.5rem;border:1px solid hsl(var(--border));border-radius:10px;margin-bottom:2rem;">
+        <div style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.6rem;">Diagnosis trajectory</div>
+        <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+          <div><span style="font-size:1.5rem;font-weight:650;">${trajectory.health_delta > 0 ? "+" : ""}${trajectory.health_delta}</span>
+            <div style="font-size:0.72rem;color:hsl(var(--text-muted));">Health ${trajectory.health_from} → ${trajectory.health_to}</div></div>
+          ${trajectory.constraint_changed ? `<div style="font-size:0.85rem;">Constraint: ${trajectory.constraint_from} → <strong>${trajectory.constraint_to}</strong></div>` : ""}
+        </div>
+        <p style="font-size:0.88rem;line-height:1.6;color:hsl(var(--text-muted));">${trajectory.interpretation}</p>
+      </div>` : ""}
       ${t.self_diagnosis ? `
       <div style="padding:1.5rem;border:1px solid hsl(var(--border));border-radius:10px;margin-bottom:3rem;">
         <div style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.6rem;">In the founder's own words</div>

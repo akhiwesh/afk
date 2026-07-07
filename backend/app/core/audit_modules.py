@@ -5,6 +5,15 @@ Each module groups questions by anatomy, maps to engine dimension(s),
 and produces a deterministic micro-payoff after sufficient coverage.
 """
 from backend.app.core import engine as ce
+from backend.app.core import evidence_intel as evi
+
+_MODULE_METRIC_KEYS = {
+    "demand": ("lead_count", "lead_conversion_pct", "top_lead_source"),
+    "qualification": ("lead_count",),
+    "conversion": ("lead_conversion_pct",),
+    "pricing": ("avg_discount_pct", "avg_order_value", "avg_monthly_revenue"),
+    "retention": ("repeat_customer_rate",),
+}
 
 # Module order for the sectional wizard
 AUDIT_MODULES = [
@@ -13,6 +22,16 @@ AUDIT_MODULES = [
         "title": "Business Context",
         "hook": "We establish what kind of business this is before testing how it earns.",
         "sections": ["profile", "revenue"],
+        "dimensions": [],
+        "evidence_hint": None,
+        "min_coverage": 1.0,
+        "diagnostic": False,
+    },
+    {
+        "id": "reflection",
+        "title": "Your Hypothesis",
+        "hook": "We capture what you believe is wrong — before examining each system, so we can cross-examine later.",
+        "sections": ["goals"],
         "dimensions": [],
         "evidence_hint": None,
         "min_coverage": 1.0,
@@ -78,16 +97,6 @@ AUDIT_MODULES = [
         "min_coverage": 1.0,
         "diagnostic": True,
     },
-    {
-        "id": "reflection",
-        "title": "Your Hypothesis",
-        "hook": "We capture what you believe is wrong — to compare against the evidence later.",
-        "sections": ["goals"],
-        "dimensions": [],
-        "evidence_hint": None,
-        "min_coverage": 1.0,
-        "diagnostic": False,
-    },
 ]
 
 _MODULE_BY_ID = {m["id"]: m for m in AUDIT_MODULES}
@@ -100,8 +109,12 @@ _QUESTIONS_BY_SECTION: dict[str, list[dict]] = {}
 for q in ce.QUESTIONS:
     _QUESTIONS_BY_SECTION.setdefault(q["section"], []).append(q)
 
+_OPTIONAL_BY_SECTION: dict[str, list[dict]] = {}
+for q in ce.OPTIONAL_QUESTIONS:
+    _OPTIONAL_BY_SECTION.setdefault(q["section"], []).append(q)
 
-def module_question_ids(module: dict) -> list[str]:
+
+def module_required_question_ids(module: dict) -> list[str]:
     ids = []
     for sec in module["sections"]:
         for q in _QUESTIONS_BY_SECTION.get(sec, []):
@@ -109,10 +122,29 @@ def module_question_ids(module: dict) -> list[str]:
     return ids
 
 
+def module_optional_questions(module: dict) -> list[dict]:
+    out = []
+    for sec in module["sections"]:
+        out.extend(_OPTIONAL_BY_SECTION.get(sec, []))
+    return out
+
+
+def module_question_ids(module: dict) -> list[str]:
+    """Required question ids — drives module completion progress."""
+    return module_required_question_ids(module)
+
+
+def module_save_question_ids(module: dict) -> list[str]:
+    """Required + optional ids accepted on module save."""
+    return module_required_question_ids(module) + [q["id"] for q in module_optional_questions(module)]
+
+
 def module_questions(module: dict) -> list[dict]:
     out = []
     for sec in module["sections"]:
         out.extend(_QUESTIONS_BY_SECTION.get(sec, []))
+    for q in module_optional_questions(module):
+        out.append({**q, "optional": True})
     return out
 
 
@@ -160,7 +192,11 @@ def _headline(module: dict, dim: dict | None, progress: dict) -> str:
     return top["reasoning"]
 
 
-def compute_module_payoff(module_id: str, answers: dict) -> dict:
+def compute_module_payoff(
+    module_id: str,
+    answers: dict,
+    evidence_metrics: dict | None = None,
+) -> dict:
     """Deterministic micro-diagnosis for one Business System block."""
     module = _MODULE_BY_ID.get(module_id)
     if not module:
@@ -260,10 +296,20 @@ def compute_module_payoff(module_id: str, answers: dict) -> dict:
     if play and status == "constraint":
         payoff["micro_action"] = play.get("next_step")
 
+    if evidence_metrics:
+        keys = _MODULE_METRIC_KEYS.get(module_id, ())
+        all_contra = evi.detect_contradictions(answers, evidence_metrics)
+        relevant = [
+            c for c in all_contra
+            if c["evidence"]["metric"] in keys or module_id in ("pricing", "retention", "conversion")
+        ][:2]
+        if relevant:
+            payoff["contradictions"] = relevant
+
     return payoff
 
 
-def list_modules_state(answers: dict) -> dict:
+def list_modules_state(answers: dict, evidence_metrics: dict | None = None) -> dict:
     """Full modular audit state for the wizard UI."""
     modules_out = []
     first_incomplete = None
@@ -284,16 +330,31 @@ def list_modules_state(answers: dict) -> dict:
         }
         if progress["complete"]:
             complete_count += 1
-            item["payoff"] = compute_module_payoff(module["id"], answers)
+            item["payoff"] = compute_module_payoff(module["id"], answers, evidence_metrics)
         else:
             if first_incomplete is None:
                 first_incomplete = module["id"]
         modules_out.append(item)
 
-    return {
+    state = {
         "modules": modules_out,
         "systems_complete": complete_count,
         "systems_total": len(AUDIT_MODULES),
         "current_module": first_incomplete or AUDIT_MODULES[-1]["id"],
         "sections": ce.AUDIT_SECTIONS,
     }
+    if complete_count == len(AUDIT_MODULES):
+        health = ce.compute_health(answers)
+        if health.get("sufficient"):
+            pc = health["primary_constraint"]
+            state["diagnosis_preview"] = {
+                "health_score": health["health_score"],
+                "primary_constraint": pc["label"],
+                "primary_score": pc["score"],
+                "hypothesis_verdict": health.get("hypothesis_verdict"),
+                "funnel_coherence": health.get("funnel_coherence"),
+                "priority_model": ce.PRIORITY_MODEL_ID,
+                "priority_ranking": (health.get("constraint_priority_ranking") or [])[:3],
+                "compound_findings": (health.get("compound_findings") or [])[:2],
+            }
+    return state

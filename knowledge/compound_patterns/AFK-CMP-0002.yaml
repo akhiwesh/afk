@@ -1,0 +1,35 @@
+id: AFK-CMP-0002
+type: compound_pattern
+name: Qualification weakness masquerading as conversion pain
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Cross-system interaction when qualification and conversion are both under pressure.
+definition: This may be a lead-quality problem disguised as a sales problem — calendar pollution upstream inflates close-rate pain.
+systems:
+- qualification
+- conversion
+trigger:
+  all_weak:
+  - system: qualification
+    threshold: 70
+  - system: conversion
+    threshold: 70
+relationships:
+- type: creates_pressure_on
+  target: AFK-SYS-0002
+  confidence: hypothesized
+- type: creates_pressure_on
+  target: AFK-SYS-0003
+  confidence: hypothesized
+todos:
+- 'TODO(validation): joint weak threshold (70) is operator judgment pending case corpus.'
+created:
+  by: AFK Research Loop #9
+  date: '2026-07-07'
+  reason: 'Phase B: compound patterns promoted to first-class KB objects'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #9
+  reason: 'Phase B: compound patterns promoted to first-class KB objects'

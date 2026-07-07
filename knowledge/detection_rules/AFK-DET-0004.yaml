@@ -7,7 +7,7 @@ owner: chief_pattern_scientist
 description: Deterministic detection rule for AFK-CON-0001 (threshold extracted verbatim from M2 engine).
 constraint_id: AFK-CON-0001
 logic: marketing_active == 'Sporadic'
-penalty: 10
+penalty: 12
 threshold_basis: operator_judgment
 evidence_map:
   required:

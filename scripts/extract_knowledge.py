@@ -132,7 +132,7 @@ def main():
         ("AFK-DET-0001", "demand", "Thin lead flow", "leads_per_month < 10", 30),
         ("AFK-DET-0002", "demand", "Single-source demand concentration", "lead_sources_count == 'One'", 25),
         ("AFK-DET-0003", "demand", "No consistent marketing", "marketing_active == 'No'", 20),
-        ("AFK-DET-0004", "demand", "Sporadic marketing", "marketing_active == 'Sporadic'", 10),
+        ("AFK-DET-0004", "demand", "Sporadic marketing", "marketing_active == 'Sporadic'", 12),
         ("AFK-DET-0005", "qualification", "No qualification process", "qualification_process startswith 'No real qualification'", 30),
         ("AFK-DET-0006", "qualification", "Low lead worthiness", "pct_leads_worth_it < 30", 25),
         ("AFK-DET-0007", "conversion", "Low close rate on serious leads", "conversion_close_rate < 30", 22),
@@ -223,15 +223,58 @@ def main():
     })
     count += 1
 
-    # ---- Questionnaire items (M2 audit, verbatim) ---------------------------
-    for i, q in enumerate(ce.QUESTIONS, start=1):
+    # ---- Questionnaire items (M2 audit + AFK-AUD-0001 optional, verbatim) --
+    que_i = 0
+    for q in ce.QUESTIONS:
+        que_i += 1
+        meta = ce.QUESTION_METADATA.get(q["id"], {})
         write("questionnaire", {
-            "id": f"AFK-QUE-{i:04d}", "type": "questionnaire_item", "name": q["label"],
+            "id": f"AFK-QUE-{que_i:04d}", "type": "questionnaire_item", "name": q["label"],
             "version": "1.0.0", "status": "hypothesis", "owner": "chief_pattern_scientist",
             "description": f"Revenue Audit question '{q['id']}' (extracted verbatim from M2).",
             "text": q["label"], "answer_type": q["type"],
             "options": q.get("options"), "engine_field": q["id"], "section": q["section"],
-            "evidence_class": "self_report",
+            "evidence_class": meta.get("evidence_class", "self_report"),
+            "scored": True,
+            "hypothesis_tested": meta.get("hypothesis_tested"),
+            "v4_status": meta.get("v4_status", "keep"),
+        })
+        count += 1
+    for q in ce.OPTIONAL_QUESTIONS:
+        que_i += 1
+        meta = ce.QUESTION_METADATA.get(q["id"], {})
+        write("questionnaire", {
+            "id": f"AFK-QUE-{que_i:04d}", "type": "questionnaire_item", "name": q["label"],
+            "version": "1.0.0", "status": "hypothesis", "owner": "chief_pattern_scientist",
+            "description": f"AFK-AUD-0001 phase-b optional field '{q['id']}' — collected, not scored until V4 penalties exist.",
+            "text": q["label"], "answer_type": q["type"],
+            "options": q.get("options"), "engine_field": q["id"], "section": q["section"],
+            "evidence_class": meta.get("evidence_class", "hypothesis"),
+            "scored": False,
+            "hypothesis_tested": meta.get("hypothesis_tested"),
+            "v4_status": meta.get("v4_status", "add_v4"),
+        })
+        count += 1
+
+    # ---- Compound patterns (cross-system interactions, verbatim) ------------
+    from backend.app.knowledge_engine.compound_runtime import _FALLBACK_PATTERNS  # noqa: E402
+    sys_map = {f"AFK-SYS-{i:04d}": key for i, key in enumerate(ce.DIMENSIONS.keys(), start=1)}
+    key_to_sys = {v: k for k, v in sys_map.items()}
+    for pat in _FALLBACK_PATTERNS:
+        rels = [
+            {"type": "creates_pressure_on", "target": key_to_sys[s], "confidence": "hypothesized"}
+            for s in pat.get("systems", []) if s in key_to_sys
+        ]
+        write("compound_patterns", {
+            "id": pat["id"], "type": "compound_pattern",
+            "name": pat["definition"][:72],
+            "version": "1.0.0", "status": "hypothesis", "owner": "chief_pattern_scientist",
+            "description": f"Cross-system compound pattern {pat['id']} (extracted from engine).",
+            "definition": pat["definition"],
+            "systems": pat["systems"],
+            "trigger": pat["trigger"],
+            "relationships": rels,
+            "todos": ["TODO(validation): trigger thresholds require calibration against case studies."],
         })
         count += 1
 

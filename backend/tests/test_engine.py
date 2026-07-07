@@ -144,6 +144,27 @@ def test_open_questions_prefer_real_gaps():
     assert any("paying customers" in q for q in qs)  # the actual missing field
 
 
+def test_open_questions_prompt_on_unknown_margin():
+    answers = dict(FULL_ANSWERS)
+    answers["gross_margin_band"] = "Unknown"
+    qs = ce.compute_open_questions(answers)
+    assert any("gross margin" in q.lower() for q in qs)
+
+
+def test_open_questions_prompt_on_unknown_cac():
+    answers = dict(FULL_ANSWERS)
+    answers["cac_known"] = "No"
+    qs = ce.compute_open_questions(answers)
+    assert any("cac" in q.lower() or "marketing and sales" in q.lower() for q in qs)
+
+
+def test_compound_findings_carry_compound_ids():
+    h = ce.compute_health(FULL_ANSWERS)
+    compound = h.get("compound_findings") or []
+    ids = {c["compound_id"] for c in compound if c.get("compound_id")}
+    assert ids <= {"AFK-CMP-0001", "AFK-CMP-0002", "AFK-CMP-0003"}
+
+
 def test_conversion_v2_spec_example_scores_47_critical():
     answers = {
         "conversion_close_rate": 32,
@@ -239,3 +260,82 @@ def test_hypothesis_verdict_contradicts_wrong_belief():
     assert hv["verdict"] == "contradicted"
     assert hv["inferred_belief_system"] == "demand"
     assert h["primary_constraint"]["key"] != "demand"
+
+
+# ---------------------------------------------------------------------------
+# Research Loop #2 — Impact priority + epistemic productization
+# ---------------------------------------------------------------------------
+
+def test_compute_constraint_priority_is_deterministic():
+    p1 = ce.compute_constraint_priority("conversion", 25)
+    p2 = ce.compute_constraint_priority("conversion", 25)
+    assert p1 == p2
+    assert p1["priority_score"] > ce.compute_constraint_priority("qualification", 65)["priority_score"]
+
+
+def test_impact_priority_overrides_lowest_score():
+    scored = [
+        {"key": "demand", "label": "Lead Volume & Demand", "score": 30, "confidence": 0.4, "findings": []},
+        {"key": "qualification", "label": "Lead Qualification", "score": 28, "confidence": 0.4, "findings": []},
+    ]
+    primary, lowest, ranking = ce._select_primary_constraint(scored)
+    assert lowest["key"] == "qualification"
+    assert primary["key"] == "demand"
+    assert ranking[0]["key"] == "demand"
+
+
+def test_full_answers_impact_priority_metadata():
+    h = ce.compute_health(FULL_ANSWERS)
+    pc = h["primary_constraint"]
+    assert pc["key"] == "conversion"
+    assert pc["selection_method"] == "impact_priority"
+    assert pc["priority"]["priority_score"] > 0
+    assert pc["priority"]["model_id"] == ce.PRIORITY_MODEL_ID
+    assert isinstance(h["constraint_priority_ranking"], list)
+    assert h["constraint_priority_ranking"][0]["key"] == pc["key"]
+    assert ce.PRIORITY_MODEL_ID in h["method_note"]
+
+
+def test_evidence_repeat_gap_boosts_retention_priority():
+    scores = [
+        {"key": "retention", "label": "Retention & Repeat Revenue", "score": 70, "confidence": 0.7, "findings": []},
+        {"key": "conversion", "label": "Sales Conversion & Follow-up", "score": 65, "confidence": 0.7, "findings": []},
+    ]
+    answers = {"repeat_rate": 62}
+    metrics = {"repeat_customer_rate": {"value": 100, "basis": "test"}}
+    adj = ce.compute_evidence_priority_adjustments(metrics, answers)
+    assert "retention" in adj
+    primary, _, _ = ce._select_primary_constraint(scores, adj)
+    assert primary["key"] == "retention"
+
+
+def test_science_provenance_on_diagnosis():
+    h = ce.compute_health(FULL_ANSWERS)
+    sp = h.get("science_provenance")
+    assert sp["priority_model_id"] == ce.PRIORITY_MODEL_ID
+    assert sp["validation_protocol_id"] == "AFK-VAL-0001"
+
+
+def test_evidence_discount_boosts_pricing_priority():
+    scores = [
+        {"key": "pricing", "label": "Pricing & Monetization", "score": 55, "confidence": 0.7, "findings": []},
+        {"key": "conversion", "label": "Sales Conversion & Follow-up", "score": 65, "confidence": 0.7, "findings": []},
+    ]
+    base_primary, _, _ = ce._select_primary_constraint(scores)
+    assert base_primary["key"] == "conversion"
+    metrics = {"avg_discount_pct": {"value": 6.1, "basis": "test"}}
+    adj = ce.compute_evidence_priority_adjustments(metrics)
+    assert "pricing" in adj
+    boosted_primary, _, _ = ce._select_primary_constraint(scores, adj)
+    assert boosted_primary["key"] == "pricing"
+
+
+def test_audit_wizard_diagnosis_preview_when_complete():
+    from backend.app.core import audit_modules as am
+    state = am.list_modules_state(FULL_ANSWERS)
+    assert state["systems_complete"] == state["systems_total"]
+    preview = state.get("diagnosis_preview")
+    assert preview
+    assert preview["primary_constraint"]
+    assert preview["hypothesis_verdict"]["verdict"] == "contradicted"
+    assert preview["priority_model"] == ce.PRIORITY_MODEL_ID

@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.knowledge_engine.registry import (
     load_registry, KnowledgeError, _validate_object)
+from backend.app.knowledge_engine.case_calibration import replay_priority_from_observation
 from backend.app.core import engine as ce
 from backend.app.core import evidence_intel as evi
 
@@ -12,9 +13,10 @@ from backend.app.core import evidence_intel as evi
 def test_registry_loads_and_validates():
     r = load_registry()
     s = r.stats()
-    assert s["total_objects"] >= 78
+    assert s["total_objects"] >= 85
+    assert s["by_type"].get("compound_pattern") == 3
     assert s["by_type"]["business_system"] == len(ce.DIMENSIONS)
-    assert s["by_type"]["questionnaire_item"] == len(ce.QUESTIONS)
+    assert s["by_type"]["questionnaire_item"] == len(ce.QUESTIONS) + len(ce.OPTIONAL_QUESTIONS)
     assert s["by_type"]["treatment"] == len(ce._CONSTRAINT_PLAYBOOK)
 
 
@@ -24,7 +26,7 @@ def test_everything_is_honest_hypothesis_with_provenance():
         o = r.get(oid)
         assert o["status"] == "hypothesis"          # nothing can claim more yet
         assert o["created"]["reason"]                # provenance mandatory
-        assert o["version"] == "1.0.0"
+        assert o["version"] in ("1.0.0", "1.1.0", "1.2.0")
 
 
 def test_no_dangling_relationships():
@@ -54,13 +56,55 @@ def test_PARITY_registry_matches_running_engine():
     for q in ce.QUESTIONS:
         assert q["id"] in ques
         assert ques[q["id"]].get("options") == q.get("options")
+        assert ques[q["id"]].get("scored") is not False
+    for q in ce.OPTIONAL_QUESTIONS:
+        assert q["id"] in ques
+        assert ques[q["id"]].get("options") == q.get("options")
+        assert ques[q["id"]].get("scored") is False
     # every treatment's uplift matches the playbook verbatim
     trts = r.by_type("treatment")
     uplifts = sorted(t["expected_outcome"]["uplift_heuristic_fraction_of_annual_revenue"] for t in trts)
     assert uplifts == sorted(p["uplift"] for p in ce._CONSTRAINT_PLAYBOOK.values())
+    for i, (key, play) in enumerate(ce._CONSTRAINT_PLAYBOOK.items(), start=1):
+        trt = r.get(f"AFK-TRT-{i:04d}")
+        eo = trt["expected_outcome"]
+        assert eo["fixability"] == play["fixability"]
+        assert eo["time_to_impact_days"] == play["time_to_impact_days"]
     # the confidence model records the live ceiling
     cfm = r.get("AFK-CFM-0001")
     assert cfm["questionnaire_ceiling"] == evi.QUESTIONNAIRE_CEILING
+    # priority model matches engine selection method
+    pri = r.get("AFK-PRI-0001")
+    assert pri["type"] == "priority_model"
+    assert ce.PRIORITY_MODEL_ID == pri["id"]
+    sample = ce.compute_constraint_priority("conversion", 25)
+    assert sample["model_id"] == pri["id"]
+
+
+def test_cas_0001_calibration_probe_without_evidence_metrics():
+    """Base PRI-0001 diverges from recorded primary — documents the gap."""
+    r = load_registry()
+    case = r.get("AFK-CAS-0001")
+    replay = replay_priority_from_observation(case["observation"])
+    assert replay["replayable"]
+    assert replay["recorded_primary"] == "Pricing & Monetization"
+    assert replay["aligned_with_lowest_score"] is True
+    assert replay["aligned_with_impact_priority"] is False
+    assert replay["engine_primary_key"] == "conversion"
+    assert replay["divergence"]
+
+
+def test_cas_0001_calibration_probe_with_invoice_metrics_aligns():
+    """Evidence adjunct reconciles N=1 case when stored invoice metrics are replayed."""
+    r = load_registry()
+    case = r.get("AFK-CAS-0001")
+    metrics = {
+        "avg_discount_pct": case["computed_metrics"]["avg_discount_pct"],
+    }
+    replay = replay_priority_from_observation(case["observation"], metrics)
+    assert replay["aligned_with_impact_priority"] is True
+    assert replay["engine_primary_key"] == "pricing"
+    assert replay["evidence_adjustments_applied"]["pricing"]["exposure_multiplier"] > 1.0
 
 
 def test_todos_mark_gaps_instead_of_inventions():

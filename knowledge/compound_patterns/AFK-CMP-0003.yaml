@@ -1,0 +1,34 @@
+id: AFK-CMP-0003
+type: compound_pattern
+name: Double monetization leak
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Pricing posture and discounting habit compound margin erosion.
+definition: Double monetization leak — underpriced positioning plus routine discounting compounds margin erosion.
+systems:
+- pricing
+trigger:
+  all_weak:
+  - system: pricing
+    threshold: 80
+  conditions:
+  - compare: all_eq
+    pairs:
+      pricing_confidence: Probably underpriced
+      discounting: Sometimes
+relationships:
+- type: creates_pressure_on
+  target: AFK-SYS-0004
+  confidence: hypothesized
+todos:
+- 'TODO(validation): joint pricing+discount pattern requires outcome observations.'
+created:
+  by: AFK Research Loop #9
+  date: '2026-07-07'
+  reason: 'Phase B: compound patterns promoted to first-class KB objects'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #9
+  reason: 'Phase B: compound patterns promoted to first-class KB objects'

@@ -13,6 +13,8 @@ treats:
 - AFK-CON-0002
 expected_outcome:
   uplift_heuristic_fraction_of_annual_revenue: 0.08
+  fixability: high
+  time_to_impact_days: 30
   basis: operator_judgment heuristic; displayed to users as a directional estimate with formula
 relationships:
 - type: treats

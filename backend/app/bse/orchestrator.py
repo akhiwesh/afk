@@ -20,7 +20,7 @@ class DiagnosticPipeline:
         EvidenceEngine.assess_quality(inputs.evidence)
 
         metrics = MetricEngine.compute(graph, inputs.evidence)
-        health = InferenceEngine.diagnose(inputs.audit_answers)
+        health = InferenceEngine.diagnose(inputs.audit_answers, inputs.evidence, metrics)
         contradictions = InferenceEngine.contradictions(inputs.audit_answers, metrics)
         confidence = InferenceEngine.confidence(inputs.audit_answers, inputs.evidence)
         recommendation = TreatmentEngine.recommend(inputs.audit_answers)

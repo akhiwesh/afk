@@ -1,0 +1,30 @@
+id: AFK-QUE-0030
+type: questionnaire_item
+name: Typical gross margin on core offer (before overhead)
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: AFK-AUD-0001 phase-b optional field 'gross_margin_band' — collected, not scored until V4 penalties exist.
+text: Typical gross margin on core offer (before overhead)
+answer_type: select
+options:
+- Below 30%
+- 30–50%
+- 50–70%
+- Above 70%
+- Unknown
+engine_field: gross_margin_band
+section: revenue
+evidence_class: hypothesis
+scored: false
+hypothesis_tested: pricing.capture_vs_cost
+v4_status: add_v4
+created:
+  by: AFK Research Loop #8
+  date: '2026-07-07'
+  reason: 'AFK-AUD-0001 phase-b: optional unscored questionnaire extraction'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #8
+  reason: 'AFK-AUD-0001 phase-b: optional unscored questionnaire extraction'

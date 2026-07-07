@@ -18,7 +18,8 @@ INVOICES = [
 
 def _legacy_clarity(answers: dict, bundle: EvidenceBundle) -> dict:
     """Reproduce pre-BSE GET /health assembly (excluding DB changes)."""
-    health = ce.compute_health(answers)
+    metrics = evi.compute_metrics(bundle.records_by_kind)
+    health = ce.compute_health(answers, bundle.kind_counts, bundle.quality_by_kind, metrics)
     health["evidence_stats"] = ce.evidence_stats(answers)
     health["open_questions"] = ce.compute_open_questions(answers)
     health["recommendation"] = ce.compute_recommendation(answers)
@@ -74,8 +75,8 @@ def test_clarity_builder_matches_orchestrator():
     inputs = PipelineInput(audit_answers=FULL_ANSWERS, evidence=bundle)
     via_pipeline = DiagnosticPipeline.run(inputs).clarity
 
-    health = ce.compute_health(FULL_ANSWERS)
     metrics = evi.compute_metrics(bundle.records_by_kind)
+    health = ce.compute_health(FULL_ANSWERS, bundle.kind_counts, bundle.quality_by_kind, metrics)
     conf = evi.evidence_confidence(FULL_ANSWERS, bundle.kind_counts, bundle.quality_by_kind)
     via_builder = ClarityBuilder.assemble(
         health=copy.deepcopy(health),

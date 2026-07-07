@@ -48,6 +48,12 @@ const STATUS_STYLE = {
   insufficient: { color: "hsl(var(--text-muted))", label: "Need more data" },
 };
 
+function ruleIdChip(ruleId, rulePack) {
+  if (!ruleId) return "";
+  const pack = rulePack ? ` · ${rulePack}` : "";
+  return `<span style="display:inline-block;background:hsl(var(--primary) / 0.12);border:1px solid hsl(var(--primary) / 0.35);border-radius:6px;padding:0.12rem 0.45rem;font-size:0.68rem;font-weight:600;letter-spacing:0.04em;color:hsl(var(--primary));margin-right:0.35rem;vertical-align:middle;">${ruleId}${pack}</span>`;
+}
+
 const SYSTEM_FINDING_LABELS = [
   ["finding", "Finding"],
   ["root_cause", "Root Cause"],
@@ -56,6 +62,46 @@ const SYSTEM_FINDING_LABELS = [
   ["recommended_action", "Recommended Action"],
   ["expected_outcome", "Expected Outcome"],
 ];
+
+function renderDiagnosisPreview(preview) {
+  if (!preview) return "";
+  const hv = preview.hypothesis_verdict;
+  const hvBorder = hv?.verdict === "contradicted" ? "hsl(38 92% 50% / 0.45)"
+    : hv?.verdict === "aligned" ? "hsl(var(--success) / 0.35)" : "hsl(var(--border))";
+  const ranking = (preview.priority_ranking || []).map((r, i) => `
+    <div style="display:flex;justify-content:space-between;padding:0.35rem 0;font-size:0.82rem;border-bottom:1px solid hsl(var(--border));">
+      <span>${i + 1}. ${r.label}</span>
+      <span style="color:hsl(var(--text-muted));">score ${r.score} · priority ${r.priority_score}</span>
+    </div>`).join("");
+  return `
+    <div style="margin-bottom:2rem;border:1px solid hsl(var(--primary) / 0.35);border-radius:12px;padding:1.35rem 1.5rem;background:hsl(var(--bg-subtle,220 14% 10%));">
+      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:hsl(var(--primary));margin-bottom:0.5rem;">Executive preview · ${preview.priority_model || "AFK-PRI-0001"}</div>
+      <div style="display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <span style="font-size:2.5rem;font-weight:650;">${preview.health_score}</span>
+        <div>
+          <div style="font-weight:600;">${preview.primary_constraint}</div>
+          <div style="font-size:0.78rem;color:hsl(var(--text-muted));">Primary constraint · score ${preview.primary_score}/100</div>
+        </div>
+      </div>
+      ${hv ? `
+        <div style="border:1px solid ${hvBorder};border-radius:10px;padding:1rem;margin:0.75rem 0;">
+          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.35rem;">Your hypothesis</div>
+          <div style="font-size:0.9rem;margin-bottom:0.5rem;">"${hv.founder_hypothesis || "—"}"</div>
+          <div style="font-size:0.85rem;line-height:1.55;"><strong style="text-transform:capitalize;">${hv.verdict}</strong> — ${hv.explanation}</div>
+        </div>` : ""}
+      ${ranking ? `<div style="margin-top:0.75rem;"><div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.35rem;">Impact ranking (top 3)</div>${ranking}</div>` : ""}
+      ${(preview.compound_findings || []).length ? `
+        <div style="margin-top:0.75rem;">
+          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.35rem;">Cross-system patterns</div>
+          ${preview.compound_findings.map(c => `
+            <div style="font-size:0.82rem;line-height:1.55;padding:0.5rem 0;border-bottom:1px solid hsl(var(--border));">
+              ${c.compound_id ? `<span style="display:inline-block;background:hsl(var(--primary) / 0.1);border:1px solid hsl(var(--primary) / 0.3);border-radius:6px;padding:0.1rem 0.4rem;font-size:0.65rem;font-weight:600;color:hsl(var(--primary));margin-right:0.35rem;">${c.compound_id}</span>` : ""}
+              ${c.reasoning}
+            </div>`).join("")}
+        </div>` : ""}
+      <p style="font-size:0.75rem;color:hsl(var(--text-muted));margin-top:0.9rem;line-height:1.5;">Operator-judgment weights — not industry benchmarks. Full diagnosis has funnel checks and evidence provenance.</p>
+    </div>`;
+}
 
 function renderPayoff(payoff) {
   if (!payoff) return "";
@@ -67,7 +113,16 @@ function renderPayoff(payoff) {
     </div>` : "";
 
   const findings = (payoff.findings || []).slice(0, 2).map(f => `
-    <li style="margin:0.5rem 0;line-height:1.55;font-size:0.9rem;">${f.reasoning}</li>`).join("");
+    <li style="margin:0.5rem 0;line-height:1.55;font-size:0.9rem;">${ruleIdChip(f.rule_id, f.rule_pack)}${f.reasoning}</li>`).join("");
+
+  const ruledFindings = (payoff.findings || []).filter(f => f.rule_id).slice(0, 3);
+  const ruleProvenanceBlock = payoff.system_finding && ruledFindings.length ? `
+    <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid hsl(var(--border));">
+      <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.4rem;">Detection rules</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.35rem;">
+        ${ruledFindings.map(f => ruleIdChip(f.rule_id, f.rule_pack)).join("")}
+      </div>
+    </div>` : "";
 
   const systemFinding = payoff.system_finding ? `
     <div style="margin-top:1rem;display:grid;gap:0.85rem;">
@@ -90,11 +145,21 @@ function renderPayoff(payoff) {
       ${payoff.verdict ? `<p style="margin-top:0.75rem;font-size:0.88rem;color:hsl(var(--text-muted));">${payoff.verdict}</p>` : ""}
       ${scoreBlock}
       ${systemFinding}
+      ${ruleProvenanceBlock}
       ${!payoff.system_finding && findings ? `<ul style="margin:0.75rem 0 0 1.1rem;padding:0;">${findings}</ul>` : ""}
       ${payoff.micro_action ? `
         <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid hsl(var(--border));">
           <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.35rem;">If this is your constraint</div>
           <p style="font-size:0.88rem;line-height:1.6;">${payoff.micro_action}</p>
+        </div>` : ""}
+      ${(payoff.contradictions || []).length ? `
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid hsl(var(--border));">
+          <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.5rem;">Belief vs uploaded evidence</div>
+          ${payoff.contradictions.map(c => `
+            <div style="border:1px solid hsl(38 92% 50% / 0.35);border-radius:8px;padding:0.85rem;margin-bottom:0.5rem;font-size:0.82rem;line-height:1.55;">
+              <div><strong>You said:</strong> "${c.belief.answer}"</div>
+              <div style="margin-top:0.35rem;"><strong>Evidence:</strong> ${c.evidence.value}${String(c.evidence.metric).includes("pct") || String(c.evidence.metric).includes("rate") ? "%" : ""} — ${c.evidence.basis}</div>
+            </div>`).join("")}
         </div>` : ""}
       ${payoff.confidence_note ? `<p style="margin-top:0.9rem;font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.5;">${payoff.confidence_note}</p>` : ""}
       ${payoff.evidence_hint && !payoff.confidence_note ? `<p style="margin-top:0.9rem;font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.5;">${payoff.evidence_hint}</p>` : ""}
@@ -162,11 +227,21 @@ export async function renderAudit(container, startModuleId = null) {
       </button>`;
     }).join("");
 
-    const questions = mod.questions.map(q => `
+    const requiredQs = mod.questions.filter(q => !q.optional);
+    const optionalQs = mod.questions.filter(q => q.optional);
+    const renderQ = (q) => `
       <label style="display:block;margin-bottom:1rem;">
-        <span style="display:block;font-size:0.85rem;margin-bottom:0.35rem;">${q.label}</span>
+        <span style="display:block;font-size:0.85rem;margin-bottom:0.35rem;">
+          ${q.label}${q.optional ? ` <span style="font-size:0.72rem;color:hsl(var(--text-muted));font-weight:400;">(optional — not scored yet)</span>` : ""}
+        </span>
         ${fieldHtml(q, answers)}
-      </label>`).join("");
+      </label>`;
+    const questions = requiredQs.map(renderQ).join("");
+    const optionalBlock = optionalQs.length ? `
+      <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px dashed hsl(var(--border));">
+        <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:hsl(var(--text-muted));margin-bottom:0.75rem;">Optional context · AFK-AUD-0001 phase-b</div>
+        ${optionalQs.map(renderQ).join("")}
+      </div>` : "";
 
     container.innerHTML = `
       <div style="max-width:720px;margin:0 auto;">
@@ -184,13 +259,15 @@ export async function renderAudit(container, startModuleId = null) {
 
         <div style="display:flex;gap:0.25rem;flex-wrap:wrap;padding-bottom:1.5rem;border-bottom:1px solid hsl(var(--border));">${stepper}</div>
 
+        ${state.systems_complete === state.systems_total && state.diagnosis_preview ? renderDiagnosisPreview(state.diagnosis_preview) : ""}
+
         <section style="padding:2rem 0;">
           <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:hsl(var(--primary));margin-bottom:0.35rem;">System ${idx + 1} of ${state.modules.length}</div>
           <h2 style="font-size:1.25rem;font-weight:600;margin-bottom:0.35rem;">${mod.title}</h2>
           <p style="font-size:0.88rem;color:hsl(var(--text-muted));line-height:1.55;margin-bottom:1.5rem;">${mod.hook}</p>
 
           ${showingPayoff && lastPayoff ? renderPayoff(lastPayoff) : `
-            <div style="display:grid;gap:0.25rem;">${questions}</div>
+            <div style="display:grid;gap:0.25rem;">${questions}${optionalBlock}</div>
             ${mod.evidence_hint ? `<p style="margin-top:1rem;font-size:0.78rem;color:hsl(var(--text-muted));line-height:1.5;">💡 ${mod.evidence_hint}</p>` : ""}
           `}
         </section>

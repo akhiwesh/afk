@@ -1,0 +1,88 @@
+id: AFK-AUD-0001
+type: audit_spec
+name: Revenue Audit Science V4 specification
+version: 1.0.0
+status: hypothesis
+owner: chief_business_scientist
+description: Implementation-ready audit redesign — each question tests one hypothesis node in the
+  revenue engine issue tree. Replaces weak/survey-style items; does not claim empirical validation.
+spec_version: '4.0'
+design_principles:
+- Hypothesis before systems — founder belief captured before scoring bias
+- Every question maps to one testable node — no orphan fields
+- Graduated penalties only — no binary cliffs without evidence
+- Evidence class declared per item — hypothesis | structure | measurement
+- Duplicate process questions consolidated
+module_order_v4:
+- context
+- reflection
+- demand
+- qualification
+- conversion
+- pricing
+- retention
+- operations
+question_reforms:
+  weak_remove:
+  - id: documented_sales_process
+    reason: Duplicates conversion_process — causes double-counting and founder confusion
+    replacement: merge into conversion_process v4 options
+  weak_reframe:
+  - id: pct_leads_worth_it
+    current_weakness: Self-estimate without anchor; fires only at extreme values
+    v4_label: Of your last 20 leads, how many were clearly wrong-fit?
+    v4_type: select
+    v4_options:
+    - 0–3 (strong filter)
+    - 4–8 (moderate)
+    - 9–14 (weak filter)
+    - 15+ (no real filter)
+    hypothesis_tested: qualification.filter_strength
+    evidence_class: hypothesis
+  - id: marketing_active
+    current_weakness: Vague cadence — consultants ask channel-level activity
+    v4_label: Which channels had deliberate outreach in 3+ of the last 4 weeks?
+    v4_type: multiselect_proxy
+    hypothesis_tested: demand.consistency
+    evidence_class: structure
+  add_v4:
+  - id: gross_margin_band
+    section: revenue
+    label: Typical gross margin on core offer (before overhead)
+    type: select
+    options:
+    - Below 30%
+    - 30–50%
+    - 50–70%
+    - Above 70%
+    - Unknown
+    hypothesis_tested: pricing.capture_vs_cost
+    evidence_class: hypothesis
+    rationale: Monetization constraints differ when margin is thin — no benchmark claimed
+  - id: cac_known
+    section: demand
+    label: Do you know customer acquisition cost per paying customer (₹)?
+    type: select
+    options:
+    - Yes, tracked
+    - Rough estimate only
+    - No
+    hypothesis_tested: demand.unit_economics_awareness
+    evidence_class: structure
+implementation_phases:
+  phase_a: module reorder + QUESTION_METADATA + spec parity tests
+  phase_b: add gross_margin_band + cac_known as optional unscored fields
+  phase_c: replace pct_leads_worth_it with v4 select — requires penalty recalibration
+  phase_d: remove documented_sales_process — migrate answers to conversion_process
+todos:
+- 'TODO(engine): implement phase_a module reorder (shipped INF-07)'
+- 'TODO(validation): recalibrate qualification penalties after v4 select migration'
+created:
+  by: Chief Business Scientist (Infrastructure Mode)
+  date: '2026-07-07'
+  reason: Audit Science — implementation-ready spec from DIAGNOSTIC_REDESIGN_V3
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: Chief Business Scientist
+  reason: Initial V4 audit specification

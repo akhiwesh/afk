@@ -1,0 +1,28 @@
+id: AFK-QUE-0031
+type: questionnaire_item
+name: Do you know customer acquisition cost per paying customer (₹)?
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: AFK-AUD-0001 phase-b optional field 'cac_known' — collected, not scored until V4 penalties exist.
+text: Do you know customer acquisition cost per paying customer (₹)?
+answer_type: select
+options:
+- Yes, tracked
+- Rough estimate only
+- 'No'
+engine_field: cac_known
+section: demand
+evidence_class: structure
+scored: false
+hypothesis_tested: demand.unit_economics_awareness
+v4_status: add_v4
+created:
+  by: AFK Research Loop #8
+  date: '2026-07-07'
+  reason: 'AFK-AUD-0001 phase-b: optional unscored questionnaire extraction'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #8
+  reason: 'AFK-AUD-0001 phase-b: optional unscored questionnaire extraction'

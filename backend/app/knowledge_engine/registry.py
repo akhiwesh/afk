@@ -40,9 +40,13 @@ TYPE_REGISTRY = {
     "treatment":         ("TRT", "treatments",        ["definition", "mechanism", "treats", "expected_outcome"]),
     "detection_rule":    ("DET", "detection_rules",   ["constraint_id", "logic", "evidence_map"]),
     "confidence_model":  ("CFM", "confidence_models", ["formula", "rationale"]),
+    "priority_model":    ("PRI", "priority_models",    ["formula", "rationale", "factors"]),
     "questionnaire_item": ("QUE", "questionnaire",    ["text", "answer_type", "evidence_class"]),
     "evidence_rule":     ("EVR", "evidence_rules",    ["evidence_kind", "quality_criteria"]),
     "case_study":        ("CAS", "cases",             ["business_profile", "observation"]),
+    "validation_protocol": ("VAL", "validation_protocols", ["protocol", "scorecard", "acceptance_criteria"]),
+    "audit_spec":        ("AUD", "audit_specs",       ["spec_version", "question_reforms"]),
+    "compound_pattern":  ("CMP", "compound_patterns", ["definition", "systems", "trigger"]),
 }
 
 RELATIONSHIP_TYPES = {

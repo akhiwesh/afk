@@ -2,9 +2,11 @@ id: AFK-CAS-0001
 type: case_study
 name: 'Case 0001: Distribution / trading'
 version: 1.0.0
-status: observed
+status: hypothesis
 owner: chief_pattern_scientist
-description: Anonymized real-business observation contributed with founder consent.
+description: Anonymized real-business observation contributed with founder consent. Ingested as
+  hypothesis until case methodology peer review completes — data is founder-reported + evidence-backed,
+  not yet elevated on the validation ladder.
 created:
   by: founder-approved ingestion pipeline
   date: '2026-07-07'
@@ -22,6 +24,10 @@ observation:
   risk_level: Low Risk
   confidence: 0.91
   primary_constraint: Pricing & Monetization
+  capture_selection_method: min_score
+  capture_note: Recorded at M3.5 ingestion with min_score selection. Lowest dimension score was pricing
+    (55). Base AFK-PRI-0001 replay ranks conversion (65) first; with stored invoice avg_discount_pct
+    6.1% the evidence adjunct ranks pricing first — reconciles Loop #4 divergence.
   dimension_scores:
     pricing: 55
     conversion: 65
@@ -62,3 +68,5 @@ evidence_summary:
 outcome:
   status: not_yet_observed
   note: Treatment outcome tracking begins after a treatment is applied.
+todos:
+- 'TODO(validation): elevate to observed after case methodology peer review and reproducibility check.'

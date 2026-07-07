@@ -3,8 +3,13 @@ from backend.app.core import engine as ce
 from backend.app.core import evidence_intel as evi
 
 
-def compute_health(answers: dict) -> dict:
-    return ce.compute_health(answers)
+def compute_health(
+    answers: dict,
+    evidence_kinds: dict[str, int] | None = None,
+    evidence_quality: dict[str, float] | None = None,
+    evidence_metrics: dict | None = None,
+) -> dict:
+    return ce.compute_health(answers, evidence_kinds, evidence_quality, evidence_metrics)
 
 
 def compute_twin(answers: dict) -> dict:

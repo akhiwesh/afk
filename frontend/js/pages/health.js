@@ -45,6 +45,10 @@ export async function renderHealth(container) {
   const st = h.evidence_stats || {};
   const rec = h.recommendation;
   const ch = h.changes;
+  const hv = h.hypothesis_verdict;
+  const fc = h.funnel_coherence;
+  const compound = h.compound_findings || [];
+  const epi = h.epistemic_confidence || h.confidence_breakdown;
 
   // ---- What changed since last diagnosis --------------------------------
   let changesBlock = "";
@@ -82,9 +86,12 @@ export async function renderHealth(container) {
 
   // ---- Findings with evidence chips ---------------------------------------
   const findings = (pc.findings || []).map(f => {
+    const ruleChip = f.rule_id
+      ? `<span style="display:inline-block;background:hsl(var(--primary) / 0.12);border:1px solid hsl(var(--primary) / 0.35);border-radius:6px;padding:0.12rem 0.45rem;font-size:0.68rem;font-weight:600;letter-spacing:0.04em;color:hsl(var(--primary));margin-right:0.35rem;">${f.rule_id}${f.rule_pack ? ` · ${f.rule_pack}` : ""}</span>`
+      : "";
     const ev = (f.evidence || []).map(e =>
       `<span style="display:inline-block;background:hsl(var(--bg-subtle,220 14% 14%));border:1px solid hsl(var(--border));border-radius:6px;padding:0.15rem 0.5rem;font-size:0.75rem;margin:0.2rem 0.3rem 0 0;color:hsl(var(--text-muted));">${e.question}: <strong style="color:hsl(var(--text));">${e.answer}</strong></span>`).join("");
-    return `<div style="padding:1rem 0;border-bottom:1px solid hsl(var(--border));"><div style="line-height:1.65;">${f.reasoning}</div><div style="margin-top:0.4rem;">${ev}</div></div>`;
+    return `<div style="padding:1rem 0;border-bottom:1px solid hsl(var(--border));"><div style="line-height:1.65;">${ruleChip}${f.reasoning}</div><div style="margin-top:0.4rem;">${ev}</div></div>`;
   }).join("");
 
   // ---- Recommendation trust card ------------------------------------------
@@ -126,6 +133,103 @@ export async function renderHealth(container) {
       <div style="font-size:1.6rem;font-weight:650;">${fmtINR(h.revenue_opportunity.amount)}<span style="font-size:0.85rem;color:hsl(var(--text-muted));font-weight:400;"> / yr</span></div>
       <div style="font-size:0.72rem;color:hsl(var(--text-muted));max-width:26ch;line-height:1.5;margin-top:0.3rem;">${h.revenue_opportunity.basis}</div></div>` : "";
 
+  const priAdj = h.priority_evidence_adjustments?.pricing || pc.priority?.evidence_adjustment;
+  const priorityNote = pc.priority ? `
+    <div style="font-size:0.75rem;color:hsl(var(--text-muted));margin-top:0.5rem;line-height:1.55;max-width:46ch;">
+      Impact priority ${pc.priority.priority_score}
+      (severity ${pc.priority.severity_index} × exposure ${pc.priority.effective_revenue_exposure ?? pc.priority.revenue_exposure} × fixability ${pc.priority.fixability}).
+      ${pc.selection_method === "impact_priority_evidence_adjusted" && priAdj
+        ? `Evidence adjusted pricing exposure — ${priAdj.basis}`
+        : pc.overrides_lowest_score
+          ? `Lowest score is ${pc.lowest_score_label} (${pc.lowest_score}/100) — ranked #1 by ₹ exposure, not raw severity.`
+          : "Also the lowest dimension score — severity and impact agree."}
+    </div>` : "";
+
+  const hvColor = hv?.verdict === "contradicted" ? "hsl(38 92% 50% / 0.45)"
+    : hv?.verdict === "aligned" ? "hsl(var(--success) / 0.35)" : "hsl(var(--border))";
+  const hypothesisBlock = hv ? `
+    <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
+      <div ${L}>Founder hypothesis vs measured constraint</div>
+      <div style="border:1px solid ${hvColor};border-radius:12px;padding:1.25rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:0.9rem;">
+          <div><div ${L}>You said</div><div style="font-size:0.95rem;">"${hv.founder_hypothesis || "—"}"</div></div>
+          <div><div ${L}>Verdict</div>
+            <div style="font-size:0.95rem;font-weight:600;text-transform:capitalize;">${hv.verdict}</div>
+            ${hv.inferred_belief_system ? `<div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-top:0.2rem;">Mapped to ${hv.inferred_belief_system}</div>` : ""}
+          </div>
+        </div>
+        <p style="font-size:0.88rem;line-height:1.6;">${hv.explanation}</p>
+      </div>
+    </div>` : "";
+
+  const funnelBlock = fc ? `
+    <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
+      <div ${L}>Funnel arithmetic check</div>
+      <div style="border:1px solid hsl(38 92% 50% / 0.45);border-radius:12px;padding:1.25rem;">
+        <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+          <div><div ${L}>Stated revenue</div><div style="font-weight:600;">${fmtINR(fc.stated_monthly_revenue)}/mo</div></div>
+          <div><div ${L}>Funnel estimate</div><div style="font-weight:600;">${fmtINR(fc.theoretical_monthly_revenue)}/mo</div></div>
+          <div><div ${L}>Ratio</div><div style="font-weight:600;">${fc.ratio}×</div></div>
+        </div>
+        <p style="font-size:0.88rem;line-height:1.6;">${fc.explanation}</p>
+        <p style="font-size:0.75rem;color:hsl(var(--text-muted));margin-top:0.5rem;line-height:1.5;">${fc.basis}</p>
+      </div>
+    </div>` : "";
+
+  const compoundBlock = compound.length ? `
+    <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
+      <div ${L}>Cross-system interactions</div>
+      ${compound.map(c => `
+        <div style="padding:0.85rem 0;border-bottom:1px solid hsl(var(--border));">
+          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-bottom:0.3rem;">
+            ${c.compound_id ? `<span style="display:inline-block;background:hsl(var(--primary) / 0.1);border:1px solid hsl(var(--primary) / 0.3);border-radius:6px;padding:0.1rem 0.4rem;font-size:0.65rem;font-weight:600;color:hsl(var(--primary));margin-right:0.4rem;">${c.compound_id}</span>` : ""}${(c.systems || []).join(" + ")}
+          </div>
+          <div style="line-height:1.65;font-size:0.9rem;">${c.reasoning}</div>
+        </div>`).join("")}
+    </div>` : "";
+
+  const epiMethod = epi?.method || "AFK-CFM-0001: questionnaire caps at 40%; uploaded evidence raises confidence.";
+  const epiOverall = epi?.overall != null ? Math.round(epi.overall * 100) : Math.round(h.confidence * 100);
+
+  const CHAIN_ORDER = ["demand", "qualification", "conversion", "pricing", "retention", "founder_dependency"];
+  const chainDims = CHAIN_ORDER.map(k => h.dimensions.find(d => d.key === k)).filter(Boolean);
+  const chainBlock = chainDims.length ? `
+    <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
+      <div ${L}>Revenue engine chain</div>
+      <p style="font-size:0.82rem;color:hsl(var(--text-muted));margin-bottom:1.25rem;max-width:68ch;line-height:1.55;">
+        How money moves through your business — colored by constraint index. Left to right: leads → close → monetize → repeat.
+      </p>
+      <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+        ${chainDims.map((d, i) => {
+          const sc = d.score;
+          const bg = sc === null ? "hsl(var(--border))" : scoreColor(sc);
+          const short = d.label.split(" ")[0];
+          return `${i > 0 ? `<span style="color:hsl(var(--text-muted));font-size:0.75rem;">→</span>` : ""}
+            <div title="${d.label}: ${sc ?? "—"}/100" style="text-align:center;min-width:4.5rem;">
+              <div style="width:2.5rem;height:2.5rem;border-radius:8px;background:${bg};margin:0 auto;opacity:${sc === null ? 0.35 : 1};"></div>
+              <div style="font-size:0.65rem;color:hsl(var(--text-muted));margin-top:0.3rem;line-height:1.2;">${short}</div>
+              <div style="font-size:0.72rem;font-weight:600;font-variant-numeric:tabular-nums;">${sc ?? "—"}</div>
+            </div>`;
+        }).join("")}
+      </div>
+    </div>` : "";
+
+  const ranking = h.constraint_priority_ranking || [];
+  const rankingBlock = ranking.length ? `
+    <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
+      <div ${L}>Constraint priority ranking · ${pc.priority?.model_id || "AFK-PRI-0001"}</div>
+      <p style="font-size:0.82rem;color:hsl(var(--text-muted));margin-bottom:1rem;max-width:68ch;line-height:1.55;">
+        Ranked by impact (severity × exposure × fixability), not dimension score alone. Operator-judgment weights — not industry benchmarks.
+      </p>
+      ${ranking.map((r, i) => `
+        <div style="display:grid;grid-template-columns:2rem 1fr auto auto;gap:0.75rem;align-items:center;padding:0.65rem 0;border-bottom:1px solid hsl(var(--border));">
+          <span style="font-weight:650;color:${i === 0 ? "hsl(var(--primary))" : "hsl(var(--text-muted))"};">#${i + 1}</span>
+          <span style="font-size:0.9rem;">${r.label}</span>
+          <span style="font-size:0.75rem;color:hsl(var(--text-muted));">score ${r.score}</span>
+          <span style="font-variant-numeric:tabular-nums;font-weight:600;font-size:0.85rem;">${r.priority_score}</span>
+        </div>`).join("")}
+    </div>` : "";
+
   container.innerHTML = `
     <div style="max-width:880px;margin:0 auto;">
       <div style="padding:2.5rem 0 1.75rem;border-bottom:1px solid hsl(var(--border));">
@@ -141,12 +245,15 @@ export async function renderHealth(container) {
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2rem;padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
         <div><div ${L}>Primary Constraint</div>
           <div style="font-size:1.15rem;font-weight:600;">${pc.label}</div>
-          <div style="font-size:0.8rem;color:hsl(var(--text-muted));margin-top:0.3rem;">Dimension score ${pc.score}/100</div></div>
-        <div><div ${L}>Diagnosis Confidence</div>
-          <div style="font-size:1.6rem;font-weight:650;">${Math.round(h.confidence * 100)}%</div>
-          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-top:0.3rem;">Computed from evidence — rises as data arrives</div></div>
+          <div style="font-size:0.8rem;color:hsl(var(--text-muted));margin-top:0.3rem;">Dimension score ${pc.score}/100 · impact-ranked</div>
+          ${priorityNote}</div>
+        <div><div ${L}>Epistemic Confidence</div>
+          <div style="font-size:1.6rem;font-weight:650;">${epiOverall}%</div>
+          <div style="font-size:0.72rem;color:hsl(var(--text-muted));margin-top:0.3rem;line-height:1.5;max-width:28ch;">${epiMethod}</div></div>
         ${opp}
       </div>
+
+      ${chainBlock}
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:2rem;padding:1.5rem 0 2rem;border-bottom:1px solid hsl(var(--border));">
         <div><div ${L}>We analyzed</div><ul style="list-style:none;font-size:0.9rem;">${analyzed}</ul></div>
@@ -154,6 +261,11 @@ export async function renderHealth(container) {
       </div>
 
       <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">${recCard}</div>
+
+      ${hypothesisBlock}
+      ${funnelBlock}
+      ${compoundBlock}
+      ${rankingBlock}
 
       ${(h.contradictions || []).length ? `
       <div style="padding:2rem 0;border-bottom:1px solid hsl(var(--border));">
@@ -219,6 +331,12 @@ export async function renderHealth(container) {
         <div ${L}>All dimensions</div>
         ${dims}
         <p style="font-size:0.75rem;color:hsl(var(--text-muted));line-height:1.6;margin-top:1.25rem;max-width:70ch;">${h.method_note}</p>
+        ${h.science_provenance ? `
+        <p style="font-size:0.68rem;color:hsl(var(--text-muted));line-height:1.55;margin-top:0.75rem;max-width:70ch;">
+          ${h.science_provenance.priority_model_id} · ${h.science_provenance.confidence_model_id} ·
+          ${h.science_provenance.engine_version} · ${h.science_provenance.rule_pack}
+          ${h.science_provenance.compound_pack ? ` · ${h.science_provenance.compound_pack}` : ""}
+        </p>` : ""}
       </div>
     </div>`;
 }

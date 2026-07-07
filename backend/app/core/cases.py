@@ -8,8 +8,8 @@ Privacy rules (hard, not configurable):
   * Industry passes through but is founder-editable at approval time.
   * The founder must explicitly approve before anything is written to the
     knowledge base. Drafts live only in the API response.
-Cases enter the KB at status `observed` with synthetic=false — they ARE
-observations, the raw material of the validation ladder.
+Cases enter the KB at status `hypothesis` until case methodology peer review completes.
+synthetic=false means the underlying data is real founder + evidence — not simulated.
 """
 from backend.app.core import engine as ce
 

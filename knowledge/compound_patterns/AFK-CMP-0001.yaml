@@ -1,0 +1,39 @@
+id: AFK-CMP-0001
+type: compound_pattern
+name: Thin funnel blocks conversion diagnosis
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: Cross-system interaction when demand and conversion are both weak with very low lead volume.
+definition: Funnel is too thin to diagnose conversion precisely — fix lead volume before optimizing close mechanics.
+systems:
+- demand
+- conversion
+trigger:
+  all_weak:
+  - system: demand
+    threshold: 70
+  - system: conversion
+    threshold: 70
+  conditions:
+  - field: leads_per_month
+    compare: lt
+    value: 20
+relationships:
+- type: creates_pressure_on
+  target: AFK-SYS-0001
+  confidence: hypothesized
+- type: creates_pressure_on
+  target: AFK-SYS-0003
+  confidence: hypothesized
+todos:
+- 'TODO(validation): thin-funnel threshold (20 leads) requires calibration against case studies.'
+created:
+  by: AFK Research Loop #9
+  date: '2026-07-07'
+  reason: 'Phase B: compound patterns promoted to first-class KB objects'
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: AFK Research Loop #9
+  reason: 'Phase B: compound patterns promoted to first-class KB objects'

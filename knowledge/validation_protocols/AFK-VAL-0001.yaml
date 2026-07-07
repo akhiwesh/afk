@@ -1,0 +1,57 @@
+id: AFK-VAL-0001
+type: validation_protocol
+name: Case-study calibration protocol v1
+version: 1.0.0
+status: hypothesis
+owner: chief_business_scientist
+description: Deterministic scorecard for replaying AFK-CAS-* observations against engine output.
+  Produces agreement metrics — never auto-elevates KB object status.
+protocol:
+  inputs_required:
+  - case_study_id
+  - observation.dimension_scores
+  - observation.primary_constraint
+  optional_inputs:
+  - computed_metrics from case evidence_summary
+  - capture_selection_method
+  replay_steps:
+  - Run base AFK-PRI-0001 on dimension_scores
+  - If computed_metrics present, apply evidence adjuncts from AFK-PRI-0001 v1.1.0
+  - Compare engine_primary_label to recorded primary_constraint
+  - Record divergence with provenance — never silently correct case
+scorecard:
+  primary_constraint_agreement:
+    weight: 0.4
+    pass: engine_primary_label == recorded_primary_constraint
+  lowest_score_agreement:
+    weight: 0.2
+    pass: engine pick matches lowest dimension score OR overrides_lowest_score is documented
+  evidence_adjunct_applied_when_metrics_present:
+    weight: 0.2
+    pass: metrics with avg_discount_pct trigger pricing adjunct when threshold met
+  contradiction_preservation:
+    weight: 0.2
+    pass: case contradictions array preserved in replay report
+  minimum_cases_for_calibration: 10
+  current_corpus_size: 1
+acceptance_criteria:
+  hypothesis_elevation: AFK-CAS-* may move to observed only after scorecard ≥0.8 on primary_constraint across N≥10
+  never: fabricate case outcomes or expert agreement percentages
+relationships:
+- type: requires
+  target: AFK-PRI-0001
+  confidence: hypothesized
+- type: requires
+  target: AFK-CAS-0001
+  confidence: hypothesized
+todos:
+- 'TODO(operations): ingest 9 more founder-approved cases before calibration pass/fail gate.'
+created:
+  by: Chief Business Scientist (Infrastructure Mode)
+  date: '2026-07-07'
+  reason: Validation harness for Business Science — protocols without fabricated results
+changelog:
+- version: 1.0.0
+  date: '2026-07-07'
+  by: Chief Business Scientist
+  reason: Initial validation protocol from Loop #4/#5 calibration work

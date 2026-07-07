@@ -110,7 +110,31 @@ QUESTIONS = [
     {"id": "biggest_worry", "section": "goals", "label": "What worries you most about the next 6 months?", "type": "text"},
 ]
 
-QUESTION_IDS = {q["id"] for q in QUESTIONS}
+# AFK-AUD-0001 phase-b: optional context — collected but not scored until V4 penalties exist.
+OPTIONAL_QUESTIONS = [
+    {"id": "gross_margin_band", "section": "revenue", "label": "Typical gross margin on core offer (before overhead)", "type": "select",
+     "options": ["Below 30%", "30–50%", "50–70%", "Above 70%", "Unknown"]},
+    {"id": "cac_known", "section": "demand", "label": "Do you know customer acquisition cost per paying customer (₹)?", "type": "select",
+     "options": ["Yes, tracked", "Rough estimate only", "No"]},
+]
+
+ALL_QUESTIONS = QUESTIONS + OPTIONAL_QUESTIONS
+QUESTION_IDS = {q["id"] for q in ALL_QUESTIONS}
+
+# Audit Science metadata (AFK-AUD-0001) — hypothesis tested per question; V4 migration status.
+QUESTION_METADATA = {
+    "business_type": {"hypothesis_tested": "context.segment", "evidence_class": "structure", "v4_status": "keep"},
+    "leads_per_month": {"hypothesis_tested": "demand.volume", "evidence_class": "hypothesis", "v4_status": "keep"},
+    "pct_leads_worth_it": {"hypothesis_tested": "qualification.filter_strength", "evidence_class": "hypothesis", "v4_status": "reframe_v4"},
+    "conversion_close_rate": {"hypothesis_tested": "conversion.close_rate", "evidence_class": "hypothesis", "v4_status": "keep"},
+    "conversion_process": {"hypothesis_tested": "conversion.structure", "evidence_class": "structure", "v4_status": "keep"},
+    "documented_sales_process": {"hypothesis_tested": "conversion.structure", "evidence_class": "structure", "v4_status": "remove_duplicate"},
+    "pricing_confidence": {"hypothesis_tested": "pricing.capture_posture", "evidence_class": "hypothesis", "v4_status": "keep"},
+    "repeat_rate": {"hypothesis_tested": "retention.repeat_rate", "evidence_class": "hypothesis", "v4_status": "keep"},
+    "self_diagnosis": {"hypothesis_tested": "founder.hypothesis", "evidence_class": "hypothesis", "v4_status": "move_early"},
+    "gross_margin_band": {"hypothesis_tested": "pricing.capture_vs_cost", "evidence_class": "hypothesis", "v4_status": "add_v4"},
+    "cac_known": {"hypothesis_tested": "demand.unit_economics_awareness", "evidence_class": "structure", "v4_status": "add_v4"},
+}
 
 # Dimension -> question ids that constitute its evidence
 DIMENSIONS = {
@@ -668,32 +692,9 @@ def _hypothesis_verdict(answers: dict, primary_key: str) -> dict | None:
 
 
 def _compound_findings(answers: dict, dims: list[dict]) -> list[dict]:
-    """Cross-system interactions (Phase 1)."""
-    by_key = {d["key"]: d for d in dims if d.get("score") is not None}
-    out = []
-
-    def _weak(key: str, threshold: int = 70) -> bool:
-        d = by_key.get(key)
-        return d is not None and d["score"] < threshold
-
-    leads = _num(answers, "leads_per_month")
-    if _weak("demand") and _weak("conversion") and leads is not None and leads < 20:
-        out.append({
-            "systems": ["demand", "conversion"],
-            "reasoning": "Funnel is too thin to diagnose conversion precisely — fix lead volume before optimizing close mechanics.",
-        })
-    if _weak("qualification") and _weak("conversion"):
-        out.append({
-            "systems": ["qualification", "conversion"],
-            "reasoning": "This may be a lead-quality problem disguised as a sales problem — calendar pollution upstream inflates close-rate pain.",
-        })
-    if answers.get("pricing_confidence") == "Probably underpriced" and answers.get("discounting") == "Sometimes":
-        if _weak("pricing", 80):
-            out.append({
-                "systems": ["pricing"],
-                "reasoning": "Double monetization leak — underpriced positioning plus routine discounting compounds margin erosion.",
-            })
-    return out
+    """Cross-system interactions — evaluated from KB compound_pattern catalog."""
+    from backend.app.knowledge_engine.compound_runtime import evaluate_compound_findings
+    return evaluate_compound_findings(answers, dims)
 
 
 _RULES = {
@@ -706,32 +707,197 @@ _RULES = {
 }
 
 # Constraint -> next step + opportunity heuristic (uplift fraction of annual revenue, shown with formula)
+# fixability / time_to_impact_days: operator-judgment metadata for impact priority (uncalibrated).
+PRIORITY_MODEL_ID = "AFK-PRI-0001"
+
+_FIXABILITY_FACTOR = {"high": 1.0, "medium": 0.85, "low": 0.70}
+_TIME_IMPACT_FACTOR = {30: 1.0, 60: 0.9, 90: 0.8}
+
+def _priority_adjunct_config() -> dict:
+    try:
+        from backend.app.knowledge_engine.kb_runtime import priority_adjunct_config
+        return priority_adjunct_config()
+    except Exception:
+        return {
+            "pricing_discount_threshold_pct": 5.0,
+            "pricing_discount_slope": 2.0,
+            "pricing_discount_cap": 2.0,
+            "retention_repeat_gap_pp": 20.0,
+            "retention_repeat_slope": 3.0,
+            "retention_repeat_cap": 1.75,
+        }
+
+
+def compute_evidence_priority_adjustments(
+    metrics: dict | None,
+    answers: dict | None = None,
+) -> dict[str, dict]:
+    """Measured-evidence multipliers for priority — never applied without uploaded metrics."""
+    if not metrics:
+        return {}
+    cfg = _priority_adjunct_config()
+    out = {}
+    thresh = cfg["pricing_discount_threshold_pct"]
+    disc = metrics.get("avg_discount_pct")
+    if disc and disc.get("value") is not None:
+        pct = float(disc["value"])
+        if pct >= thresh:
+            boost = min(
+                cfg["pricing_discount_cap"],
+                (pct - thresh) / cfg["pricing_discount_slope"],
+            )
+            mult = round(1 + boost, 3)
+            out["pricing"] = {
+                "exposure_multiplier": mult,
+                "source_metric": "avg_discount_pct",
+                "source_value": pct,
+                "threshold_pct": thresh,
+                "basis": (
+                    f"Invoice evidence: average discount {pct}% exceeds {thresh}% "
+                    f"threshold — pricing revenue exposure ×{mult} (AFK-PRI-0001 evidence adjunct). "
+                    "Slope is operator judgment calibrated against AFK-CAS-0001; not an industry benchmark."
+                ),
+            }
+
+    stated_rr = _num(answers or {}, "repeat_rate")
+    measured = metrics.get("repeat_customer_rate")
+    if stated_rr is not None and measured and measured.get("value") is not None:
+        actual = float(measured["value"])
+        gap = abs(stated_rr - actual)
+        if gap >= cfg["retention_repeat_gap_pp"]:
+            boost = min(cfg["retention_repeat_cap"] - 1.0, gap / cfg["retention_repeat_slope"])
+            mult = round(1 + boost, 3)
+            out["retention"] = {
+                "exposure_multiplier": mult,
+                "source_metric": "repeat_customer_rate",
+                "source_value": actual,
+                "stated_value": stated_rr,
+                "gap_pp": round(gap, 1),
+                "basis": (
+                    f"Invoice evidence: measured repeat customer rate {actual}% vs stated {int(stated_rr)}% "
+                    f"(gap {int(gap)}pp) — retention exposure ×{mult}. "
+                    "Applied only when uploaded invoices contradict self-report."
+                ),
+            }
+    return out
+
+
+def build_science_provenance(kb_release: str | None = None) -> dict:
+    """Version tags for reproducible diagnosis — AFK moat: scientific versioning."""
+    from backend.app.knowledge_engine.rule_provenance import RULE_PACK_ID
+    from backend.app.knowledge_engine.compound_runtime import COMPOUND_PACK_ID
+    return {
+        "engine_version": "bse-1.0.0",
+        "kb_release": kb_release or "registry-live",
+        "confidence_model_id": "AFK-CFM-0001",
+        "priority_model_id": PRIORITY_MODEL_ID,
+        "validation_protocol_id": "AFK-VAL-0001",
+        "audit_spec_id": "AFK-AUD-0001",
+        "rule_pack": RULE_PACK_ID,
+        "compound_pack": COMPOUND_PACK_ID,
+        "note": "Findings cite AFK-DET-* via rule_provenance; compounds cite AFK-CMP-* via compound_runtime.",
+    }
+
 _CONSTRAINT_PLAYBOOK = {
     "demand": {
         "next_step": "Before spending on ads: pick ONE additional lead source that matches how your customers already buy, and commit to it for 30 days. Volume is the cap right now — nothing downstream can compensate.",
         "uplift": 0.15,
+        "fixability": "medium",
+        "time_to_impact_days": 60,
     },
     "qualification": {
         "next_step": "Write down 3 disqualifying questions and ask them in the first conversation. The goal this month is fewer conversations, not more.",
         "uplift": 0.08,
+        "fixability": "high",
+        "time_to_impact_days": 30,
     },
     "conversion": {
         "next_step": "Install a dead-simple follow-up system this week: every open lead gets a next-touch date, and no lead is closed-lost before 5 touches. This is the highest-leverage fix because the leads are already paid for.",
         "uplift": 0.20,
+        "fixability": "high",
+        "time_to_impact_days": 30,
     },
     "pricing": {
         "next_step": "Quote 15–20% higher to the next three NEW prospects only. Existing customers unchanged. You are buying information about willingness to pay for the price of three conversations.",
         "uplift": 0.12,
+        "fixability": "medium",
+        "time_to_impact_days": 30,
     },
     "retention": {
         "next_step": "Call five customers who stopped buying and ask one question: 'what changed?' Do not sell on the call. Their answers are the retention strategy.",
         "uplift": 0.18,
+        "fixability": "medium",
+        "time_to_impact_days": 60,
     },
     "founder_dependency": {
         "next_step": "Record yourself on the next three sales calls, then write the one-page playbook of what actually happens. You can't delegate what isn't written down.",
         "uplift": 0.10,
+        "fixability": "low",
+        "time_to_impact_days": 90,
     },
 }
+
+
+def compute_constraint_priority(
+    dim_key: str,
+    score: int,
+    evidence_adjustments: dict[str, dict] | None = None,
+) -> dict:
+    """Impact-weighted constraint priority (DIAGNOSTIC_REDESIGN_V3 §8).
+
+    priority = severity × revenue_exposure × fixability × time_factor
+    where severity = (100 − score) / 100 and revenue_exposure proxies to playbook uplift.
+    Optional evidence_adjustments multiply exposure when uploaded metrics justify it."""
+    play = _CONSTRAINT_PLAYBOOK.get(dim_key, {})
+    severity = (100 - score) / 100.0
+    exposure = play.get("uplift", 0.10)
+    fix = _FIXABILITY_FACTOR.get(play.get("fixability", "medium"), 0.85)
+    time_days = play.get("time_to_impact_days", 60)
+    time_f = _TIME_IMPACT_FACTOR.get(time_days, 0.9)
+    adj = (evidence_adjustments or {}).get(dim_key, {})
+    mult = adj.get("exposure_multiplier", 1.0)
+    effective_exposure = exposure * mult
+    priority = severity * effective_exposure * fix * time_f
+    result = {
+        "model_id": PRIORITY_MODEL_ID,
+        "priority_score": round(priority, 4),
+        "severity_index": round(severity * 100, 1),
+        "revenue_exposure": exposure,
+        "effective_revenue_exposure": round(effective_exposure, 4),
+        "fixability": fix,
+        "fixability_label": play.get("fixability", "medium"),
+        "time_to_impact_days": time_days,
+        "formula": (
+            "(100 − score) / 100 × uplift_heuristic × fixability × time_factor"
+            + (" × evidence_exposure_multiplier" if mult != 1.0 else "")
+            + " — operator-judgment weights unless evidence multiplier applied."
+        ),
+    }
+    if mult != 1.0:
+        result["evidence_adjustment"] = adj
+    return result
+
+
+def _select_primary_constraint(
+    scored: list[dict],
+    evidence_adjustments: dict[str, dict] | None = None,
+) -> tuple[dict, dict, list[dict]]:
+    """Pick primary by impact priority; tie-break on lower dimension score."""
+    lowest = min(scored, key=lambda d: d["score"])
+    ranking = []
+    for d in scored:
+        pri = compute_constraint_priority(d["key"], d["score"], evidence_adjustments)
+        ranking.append({
+            "key": d["key"],
+            "label": d["label"],
+            "score": d["score"],
+            "confidence": d["confidence"],
+            **pri,
+        })
+    ranking.sort(key=lambda x: (-x["priority_score"], x["score"]))
+    primary_key = ranking[0]["key"]
+    primary = next(d for d in scored if d["key"] == primary_key)
+    return primary, lowest, ranking
 
 
 def compute_twin(answers: dict) -> dict:
@@ -784,6 +950,7 @@ def compute_health(
     answers: dict,
     evidence_kinds: dict[str, int] | None = None,
     evidence_quality: dict[str, float] | None = None,
+    evidence_metrics: dict | None = None,
 ) -> dict:
     """Full diagnosis. Returns either sufficient=False with what's missing,
     or the health score + per-dimension findings, all evidence-cited."""
@@ -795,6 +962,9 @@ def compute_health(
         coverage = _dimension_confidence(answers, key)
         missing = [_QLABEL[f] for f in meta["fields"] if answers.get(f) in (None, "")]
         findings = _RULES[key](answers) if coverage > 0 else []
+        if findings:
+            from backend.app.knowledge_engine.rule_provenance import annotate_findings
+            annotate_findings(findings, key)
         score = None
         if _dimension_scorable(coverage):
             score = max(0, 100 - sum(f["penalty"] for f in findings))
@@ -827,7 +997,14 @@ def compute_health(
     )
     health = round(weighted_score / total_conf_weight)
     scored = [d for d in dims_out if d["score"] is not None]
-    primary = min(scored, key=lambda d: d["score"])
+    priority_adjustments = compute_evidence_priority_adjustments(evidence_metrics, answers)
+    primary, lowest_scored, priority_ranking = _select_primary_constraint(scored, priority_adjustments)
+    primary_priority = compute_constraint_priority(
+        primary["key"], primary["score"], priority_adjustments,
+    )
+    selection_method = (
+        "impact_priority_evidence_adjusted" if priority_adjustments else "impact_priority"
+    )
     overall_conf = epi_breakdown["overall"]
 
     weakest = min(d["score"] for d in scored) if scored else health
@@ -875,7 +1052,16 @@ def compute_health(
             "score": primary["score"],
             "confidence": primary["confidence"],
             "findings": primary["findings"],
+            "selection_method": selection_method,
+            "priority": primary_priority,
+            "lowest_score_key": lowest_scored["key"],
+            "lowest_score_label": lowest_scored["label"],
+            "lowest_score": lowest_scored["score"],
+            "overrides_lowest_score": primary["key"] != lowest_scored["key"],
         },
+        "constraint_priority_ranking": priority_ranking,
+        "priority_evidence_adjustments": priority_adjustments or None,
+        "science_provenance": build_science_provenance(),
         "revenue_opportunity": opportunity,
         "recommended_next_step": play["next_step"] if play else None,
         "dimensions": sorted(dims_out, key=lambda d: (d["score"] is None, d["score"] if d["score"] is not None else 0)),
@@ -889,6 +1075,7 @@ def compute_health(
                         "subtracts a stated penalty, and every finding cites the answers it is based on. "
                         "A system scores only when 100% of its evidence fields are answered. "
                         "Epistemic confidence follows AFK-CFM-0001 (questionnaire caps at 40%). "
+                        f"Primary constraint ranked by {PRIORITY_MODEL_ID}. "
                         "Overall health is capped when any system is Critical (<55)."),
     }
 
@@ -1020,9 +1207,21 @@ _CONSTRAINT_PROBES = {
 }
 
 
+_OPTIONAL_EVIDENCE_PROMPTS: dict[str, dict[str, str]] = {
+    "gross_margin_band": {
+        "Unknown": "What is your typical gross margin on your core offer? A P&L or unit-cost breakdown would sharpen monetization diagnosis.",
+        "Below 30%": "Thin margins amplify pricing pressure — can you share unit economics (COGS vs price) for your core offer?",
+    },
+    "cac_known": {
+        "No": "What did you spend on marketing and sales last quarter, and how many new paying customers resulted? CAC unlocks demand ROI diagnosis.",
+        "Rough estimate only": "Refine CAC with tracked spend ÷ new customers — even one quarter of data sharpens demand priority.",
+    },
+}
+
+
 def compute_open_questions(answers: dict) -> list[str]:
     """Questions AFK still has: unanswered audit fields first (real gaps),
-    then constraint-specific probes. Max 5."""
+    optional-field evidence prompts, then constraint-specific probes. Max 5."""
     h = compute_health(answers)
     out = []
     # Real evidence gaps, most-impactful dimensions first
@@ -1031,6 +1230,13 @@ def compute_open_questions(answers: dict) -> list[str]:
             q = f"{m}?" if not m.endswith("?") else m
             if q not in out:
                 out.append(q)
+    # Optional V4 fields — evidence prompts when answer signals uncertainty
+    for field_id, by_answer in _OPTIONAL_EVIDENCE_PROMPTS.items():
+        ans = answers.get(field_id)
+        if ans in by_answer:
+            prompt = by_answer[ans]
+            if prompt not in out:
+                out.append(prompt)
     # Constraint probes
     if h.get("sufficient"):
         for probe in _CONSTRAINT_PROBES.get(h["primary_constraint"]["key"], []):
@@ -1068,7 +1274,15 @@ def compute_recommendation(answers: dict) -> Optional[dict]:
     return {
         "action": play.get("next_step"),
         "constraint": pc["label"],
-        "why": top["reasoning"] if top else "This dimension scored lowest among all measured dimensions.",
+        "why": (
+            top["reasoning"] if top else (
+                f"Impact priority ranks {pc['label']} above "
+                f"{pc.get('lowest_score_label', 'other systems')} despite a higher dimension score — "
+                "revenue exposure and fixability outweigh raw severity."
+                if pc.get("overrides_lowest_score") else
+                "This dimension ranks highest on impact-weighted priority among all measured dimensions."
+            )
+        ),
         "evidence": [e for f in pc["findings"] for e in f["evidence"]],
         "confidence_pct": int(pc["confidence"] * 100),
         "confidence_basis": (

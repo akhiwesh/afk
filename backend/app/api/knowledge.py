@@ -3,6 +3,7 @@ query it, never mutate it. Mutation happens via files + review, per KB_ARCHITECT
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.knowledge_engine.registry import get_registry
+from backend.app.knowledge_engine.validation_framework import score_corpus
 from backend.app.models.auth import User
 from backend.app.api.deps import get_current_user
 
@@ -12,6 +13,12 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 @router.get("/stats")
 def kb_stats(current_user: User = Depends(get_current_user)):
     return get_registry().stats()
+
+
+@router.get("/validation/corpus")
+def kb_validation_corpus(current_user: User = Depends(get_current_user)):
+    """AFK-VAL-0001 corpus scorecard — descriptive only until N≥10 cases."""
+    return score_corpus()
 
 
 @router.get("/search")

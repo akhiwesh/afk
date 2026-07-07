@@ -1,0 +1,43 @@
+id: AFK-CAS-0002
+type: case_study
+name: 'Case 0002: Synthetic B2B agency (validation fixture)'
+version: 1.0.0
+status: hypothesis
+owner: chief_business_scientist
+description: Synthetic case for AFK-VAL-0001 harness testing only. Not a real business — clearly
+  labeled synthetic=true. Used to verify corpus machinery without fabricating observed outcomes.
+synthetic: true
+business_profile:
+  business_type: B2B services / agency
+  industry: Consulting
+  growth_stage: Early revenue (finding repeatability)
+  team_band: 4-10
+  revenue_band: 5L-10L
+  revenue_model: Mixed
+observation:
+  health_score: 48
+  risk_level: High Risk
+  confidence: 0.4
+  primary_constraint: Sales Conversion & Follow-up
+  capture_selection_method: impact_priority
+  dimension_scores:
+    conversion: 25
+    pricing: 42
+    demand: 43
+    founder_dependency: 52
+    qualification: 65
+    retention: 70
+computed_metrics: {}
+evidence_summary:
+  kinds: {}
+  audit_completeness: 1
+contradictions: []
+outcome:
+  status: not_yet_observed
+  note: Synthetic fixture — no treatment outcomes.
+todos:
+- 'TODO(operations): replace with founder-approved case when available.'
+created:
+  by: validation_framework (synthetic fixture)
+  date: '2026-07-07'
+  reason: Corpus machinery test fixture — not empirical validation data
