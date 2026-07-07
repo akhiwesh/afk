@@ -1,6 +1,51 @@
 import { API } from "../api.js";
 import { UI } from "../ui.js";
+import { navigateToEvidence } from "./evidence.js";
 import { renderGauge, ruleIdChip, scoreStatus, dimScoreColor, sectionLabel } from "../diagnostic-ui.js";
+
+const EVIDENCE_KIND_LABELS = {
+  invoices: "Invoices",
+  leads: "Lead export",
+  transactions: "Transactions",
+  customers: "Customer list",
+};
+
+function rankedMissingEvidence(pc, items) {
+  const missing = (items || []).filter((m) => !m.covered && m.suggestion && m.evidence_kind);
+  return missing.sort((a, b) => {
+    const aPrimary = a.dimension === pc?.label ? 1 : 0;
+    const bPrimary = b.dimension === pc?.label ? 1 : 0;
+    return bPrimary - aPrimary;
+  });
+}
+
+function evidenceCtaPanel(pc, missingEvidence) {
+  const ranked = rankedMissingEvidence(pc, missingEvidence).slice(0, 3);
+  if (!ranked.length) return "";
+
+  return `
+    <div class="diag-block">
+      <div class="diag-panel is-warn">
+        ${sectionLabel("Upload this to sharpen diagnosis")}
+        <p class="diag-muted-sm" style="margin-bottom:1rem;max-width:68ch;">
+          Audit answers cap confidence at 40% per dimension. Uploaded evidence raises it — and can surface contradictions between what you believe and what your data shows.
+        </p>
+        ${ranked.map((m, i) => `
+          <div class="diag-ev-cta-card ${i === 0 && m.dimension === pc.label ? "is-primary" : ""}">
+            <div class="diag-ev-cta-head">
+              <span style="font-weight:600;font-size:0.92rem;">${m.dimension}</span>
+              ${m.dimension === pc.label
+                ? `<span class="diag-evidence is-high">Primary constraint</span>`
+                : `<span class="diag-evidence is-medium">Raises confidence</span>`}
+            </div>
+            <p class="diag-muted-sm" style="margin-bottom:0.75rem;">${m.suggestion}</p>
+            <button type="button" class="diag-btn-primary" data-evidence-upload="${m.evidence_kind}">
+              Upload ${EVIDENCE_KIND_LABELS[m.evidence_kind] || m.evidence_kind} →
+            </button>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
 
 const fmtINR = (n) => "₹" + Number(n).toLocaleString("en-IN");
 
@@ -314,6 +359,8 @@ export async function renderHealth(container) {
         </div>
       </div>
 
+      ${evidenceCtaPanel(pc, h.missing_evidence)}
+
       <div class="diag-stat-grid diag-block">
         <div>${sectionLabel("Primary Constraint")}
           <div style="font-size:1.15rem;font-weight:600;">${pc.label}</div>
@@ -379,17 +426,6 @@ export async function renderHealth(container) {
         <p class="diag-stat-label" style="margin-top:0.9rem;max-width:70ch;">${h.confidence_breakdown.method}</p>
       </div>` : ""}
 
-      ${(h.missing_evidence || []).some(m => !m.covered) ? `
-      <div class="diag-block">
-        ${sectionLabel("Evidence that would sharpen this diagnosis")}
-        ${h.missing_evidence.filter(m => !m.covered && m.suggestion).map(m => `
-          <div style="padding:0.6rem 0;border-bottom:1px solid #f1f5f9;">
-            <span style="font-weight:600;font-size:0.88rem;">${m.dimension}:</span>
-            <span class="diag-muted-sm"> ${m.suggestion}</span>
-          </div>`).join("")}
-        <a href="#evidence" class="diag-btn-secondary" style="margin-top:1rem;display:inline-block;text-decoration:none;">Upload evidence →</a>
-      </div>` : ""}
-
       <div class="diag-block">
         ${sectionLabel("Why AFK believes this")}
         ${findings || '<p class="diag-muted">No penalizing findings in the primary constraint dimension.</p>'}
@@ -413,6 +449,10 @@ export async function renderHealth(container) {
     </div>`;
 
   wireTreatmentHandlers(container);
+
+  container.querySelectorAll("[data-evidence-upload]").forEach((btn) => {
+    btn.addEventListener("click", () => navigateToEvidence(btn.dataset.evidenceUpload));
+  });
 
   container.querySelector("#health-export-pdf")?.addEventListener("click", async () => {
     const btn = container.querySelector("#health-export-pdf");

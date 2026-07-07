@@ -712,6 +712,86 @@
   margin-top: 0.75rem;
 }
 
+.diag-upload-zone {
+  border: 2px dashed var(--diag-border);
+  border-radius: 10px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  background: var(--diag-surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.diag-upload-zone.is-highlight {
+  border-color: var(--diag-amber);
+  background: var(--diag-amber-light);
+}
+
+.diag-upload-zone.is-dragover {
+  border-color: var(--diag-amber-dark);
+  background: #fff7ed;
+}
+
+.diag-select {
+  width: 100%;
+  border: 1.5px solid var(--diag-border);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.84rem;
+  color: var(--diag-text-primary);
+  background: var(--diag-surface);
+}
+
+.diag-ev-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--diag-border-subtle);
+}
+
+.diag-ev-map-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--diag-border-subtle);
+}
+
+.diag-ev-cta-card {
+  border: 1px solid var(--diag-border-subtle);
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  margin-bottom: 0.75rem;
+  background: var(--diag-surface);
+}
+
+.diag-ev-cta-card.is-primary {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.diag-ev-cta-card:last-child { margin-bottom: 0; }
+
+.diag-ev-cta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+
+.diag-status-pill.is-confirmed { color: #065f46; background: #d1fae5; border-color: #34d399; }
+.diag-status-pill.is-pending { color: #92400e; background: #fef3c7; border-color: #fbbf24; }
+
+[data-theme="dark"] .diag-select {
+  background: var(--diag-surface);
+  border-color: var(--diag-border-subtle);
+  color: var(--diag-text-primary);
+}
+
 /* Dark app shell: diagnostic canvas stays light (Mercury/Stripe report pattern) */
 [data-theme="dark"] .diag-page {
   background: var(--diag-canvas);
