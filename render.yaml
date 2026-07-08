@@ -1,18 +1,24 @@
-# One-click deploy config for Render.com (free tier works for testing).
-# Connect the repo/folder to Render; it reads this file automatically.
+# Render Blueprint — AFK Revenue Diagnostic
+# Connect github.com/akhiwesh/afk → New Blueprint → deploy.
+# Then point afk.agency DNS (CNAME) at the Render service URL.
 services:
   - type: web
     name: afk-platform
     runtime: python
     plan: free
+    healthCheckPath: /api/health
     buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHONPATH
+        value: .
       - key: AFK_ENV
         value: production
       - key: AFK_SECRET_KEY
-        generateValue: true       # Render generates a strong secret automatically
+        generateValue: true
       - key: AFK_CORS_ORIGINS
-        value: "*PLACEHOLDER*"    # after first deploy, set to your https://afk-xxxx.onrender.com URL
+        value: https://afk.agency,https://www.afk.agency
+      - key: AFK_DEMO_MODE
+        value: "true"
       - key: PYTHON_VERSION
         value: "3.12"

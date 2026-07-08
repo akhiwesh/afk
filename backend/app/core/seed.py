@@ -10,6 +10,37 @@ from backend.app.models.ai import AIConversation, AIMessage, AIAssistantType, Ge
 from backend.app.models.automation import Workflow
 from backend.app.models.finance import Invoice, InvoiceStatus
 
+# Shared demo session identity — used by POST /api/auth/demo (one-click demos).
+DEMO_EMAIL = "demo@afk.agency"
+DEMO_PASSWORD = "DemoSession1"
+DEMO_ORG_NAME = "Meridian Growth Co."
+DEMO_USER_NAME = "Jordan Lee (Founder)"
+
+
+def ensure_demo_session(session: Session) -> User:
+    """Idempotently provision demo org, user, and a completed Revenue Audit."""
+    user = session.exec(select(User).where(User.email == DEMO_EMAIL)).first()
+    if user:
+        seed_demo_audit(session, user.organization_id)
+        return user
+
+    org = Organization(name=DEMO_ORG_NAME)
+    session.add(org)
+    session.flush()
+
+    user = User(
+        email=DEMO_EMAIL,
+        full_name=DEMO_USER_NAME,
+        hashed_password=get_password_hash(DEMO_PASSWORD),
+        role=UserRole.ADMIN,
+        organization_id=org.id,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    seed_demo_audit(session, user.organization_id)
+    return user
+
 
 def seed_demo_audit(session, org_id: int):
     """Seed a realistic completed Revenue Audit for the demo organization.

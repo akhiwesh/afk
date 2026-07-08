@@ -53,7 +53,7 @@ export const API = {
       const response = await fetch(url, config);
       
       // Handle session expiration
-      if (response.status === 401 && endpoint !== "/auth/login") {
+      if (response.status === 401 && !["/auth/login", "/auth/demo"].includes(endpoint)) {
         localStorage.removeItem("access_token");
         localStorage.removeItem("user_profile");
         window.dispatchEvent(new Event("auth-changed"));

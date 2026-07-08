@@ -9,6 +9,7 @@ settings = get_settings()
 from typing import Optional
 
 from backend.app.core.database import get_session
+from backend.app.core.seed import ensure_demo_session, DEMO_EMAIL
 from backend.app.core.security import verify_password, create_access_token, get_password_hash
 from backend.app.models.auth import User, Organization, UserRole
 from backend.app.api.deps import get_current_user
@@ -54,6 +55,32 @@ class UserResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+def _auth_response(response: Response, user: User, *, demo: bool = False) -> dict:
+    token = create_access_token(subject=user.email)
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {token}",
+        httponly=True,
+        max_age=3600 * 24 * 7,
+        expires=3600 * 24 * 7,
+        samesite="lax",
+        secure=settings.is_production,
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "demo": demo,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "organization_id": user.organization_id,
+        },
+    }
+
 
 @router.post("/register", response_model=UserResponse)
 def register(data: UserRegister, db: Session = Depends(get_session)):
@@ -104,30 +131,25 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
         
-    token = create_access_token(subject=user.email)
-    
-    # Set HTTP-Only Cookie for seamless browser requests
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {token}",
-        httponly=True,
-        max_age=3600 * 24 * 7,  # 7 days
-        expires=3600 * 24 * 7,
-        samesite="lax",
-        secure=settings.is_production,  # HTTPS-only cookie in production
-    )
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "full_name": user.full_name,
-            "role": user.role,
-            "organization_id": user.organization_id
-        }
-    }
+    return _auth_response(response, user)
+
+
+@router.post("/demo")
+def start_demo_session(response: Response, db: Session = Depends(get_session)):
+    """Provision (or reuse) a sample business with a completed audit and sign in."""
+    if not settings.demo_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo sessions are disabled in this environment.",
+        )
+    user = ensure_demo_session(db)
+    if user.email != DEMO_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Demo session provisioning failed.",
+        )
+    return _auth_response(response, user, demo=True)
+
 
 @router.post("/logout")
 def logout(response: Response):

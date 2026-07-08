@@ -9,6 +9,7 @@ defaults. In production, set these via environment variables:
   AFK_CORS_ORIGINS - comma-separated allowed origins (default: localhost dev)
   AFK_ENV          - "development" (default) or "production"
   AFK_SEED_DEMO    - "true" to seed demo org on empty DB (default: false)
+  AFK_DEMO_MODE    - "true" to enable one-click demo sessions (default: on in dev, off in prod)
 """
 import os
 import secrets
@@ -52,6 +53,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.env.lower() == "production"
+
+    @property
+    def demo_enabled(self) -> bool:
+        """One-click demo sessions: on in development unless explicitly disabled."""
+        raw = os.getenv("AFK_DEMO_MODE")
+        if raw is not None:
+            return raw.lower() in ("1", "true", "yes")
+        return not self.is_production
 
 
 @lru_cache

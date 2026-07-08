@@ -1,5 +1,6 @@
 import { API } from "../api.js";
 import { AppRouter } from "../router.js";
+import { UI } from "../ui.js";
 
 export function renderLanding(container) {
   container.innerHTML = `
@@ -9,9 +10,9 @@ export function renderLanding(container) {
         AFK Platform
       </div>
       <nav class="nav-links">
-        <a href="#features">Features</a>
+        <a href="#offer">Diagnostic offer</a>
+        <a href="#features">Platform</a>
         <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
         ${API.isAuthenticated() 
           ? `<a href="#diagnosis" class="btn btn-primary btn-sm">Dashboard</a>`
           : `<a href="#login" class="btn btn-secondary btn-sm">Sign In</a>`
@@ -34,9 +35,10 @@ export function renderLanding(container) {
           Evidence → diagnosis → clarity. Upload your invoices and CRM exports, complete the Revenue Audit, and see what your data proves — never invented numbers.
         </p>
         
-        <div style="display:flex; justify-content:center; gap:1rem;">
-          <a href="#register" class="btn btn-primary btn-lg">Create your organisation</a>
-          <a href="#login" class="btn btn-secondary btn-lg">Sign in</a>
+        <div style="display:flex; justify-content:center; gap:1rem; flex-wrap:wrap;">
+          <a href="#offer" class="btn btn-primary btn-lg">Revenue Constraint Diagnostic</a>
+          <button type="button" class="btn btn-secondary btn-lg" id="landing-demo-btn">Try demo business</button>
+          <a href="#register" class="btn btn-secondary btn-lg" style="opacity:0.85;">Create organisation</a>
         </div>
       </section>
 
@@ -108,10 +110,15 @@ export function renderLanding(container) {
         </div>
       </section>
 
-      <!-- Pricing Plans Toggle section -->
+      <!-- Pricing / offer bridge -->
       <section id="pricing" style="margin-bottom:6rem; text-align:center;">
-        <h2 style="font-size:2rem; margin-bottom:1rem;">Simple pricing. Build for scale.</h2>
-        <p style="margin-bottom:2.5rem;">Choose the right plan to fuel your startup's growth loops.</p>
+        <h2 style="font-size:2rem; margin-bottom:1rem;">Start with clarity, then scale.</h2>
+        <p style="margin-bottom:1.25rem;max-width:36rem;margin-left:auto;margin-right:auto;">
+          The concierge <strong>Revenue Constraint Diagnostic</strong> (₹49,000) is how most founders begin —
+          evidence-grounded diagnosis before any platform subscription.
+        </p>
+        <a href="#offer" class="btn btn-primary" style="margin-bottom:2.5rem;">View diagnostic offer →</a>
+        <p style="font-size:0.82rem;color:hsl(var(--text-muted));margin-bottom:2.5rem;">Self-serve platform plans (parked — diagnostic first)</p>
         
         <div style="display:inline-flex; background-color:hsl(var(--bg-sidebar)); padding:4px; border-radius:var(--radius-md); border:1px solid hsl(var(--border)); margin-bottom:3rem;">
           <button class="btn btn-secondary btn-sm" style="background-color:hsl(var(--bg-card)); border:none;" id="toggle-monthly">Monthly</button>
@@ -225,4 +232,28 @@ export function renderLanding(container) {
     pGrowth.innerHTML = `$39<span style="font-size:1rem; font-weight:400; color:hsl(var(--text-muted));">/mo</span>`;
     pScale.innerHTML = `$119<span style="font-size:1rem; font-weight:400; color:hsl(var(--text-muted));">/mo</span>`;
   });
+
+  const demoBtn = container.querySelector("#landing-demo-btn");
+  if (demoBtn) {
+    demoBtn.addEventListener("click", async () => {
+      demoBtn.disabled = true;
+      const label = demoBtn.textContent;
+      demoBtn.textContent = "Loading demo…";
+      try {
+        const data = await API.post("/auth/demo", {});
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("user_profile", JSON.stringify(data.user));
+        if (data.demo) {
+          localStorage.setItem("afk_demo_session", "true");
+        }
+        UI.toast("Demo loaded — sample diagnosis ready.", "success");
+        window.dispatchEvent(new Event("auth-changed"));
+        AppRouter.navigate("#diagnosis");
+      } catch (err) {
+        UI.toast(err.message || "Demo session unavailable.", "error");
+        demoBtn.disabled = false;
+        demoBtn.textContent = label;
+      }
+    });
+  }
 }

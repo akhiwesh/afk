@@ -28,6 +28,7 @@ def init_db() -> None:
         RevenueAudit, DiagnosisSnapshot, EvidenceDataset, EvidenceRecord,
         BenchmarkSample, TreatmentOutcome, MemoryEvent,
     )
+    from backend.app.models.offer import OfferInquiry
     
     SQLModel.metadata.create_all(engine)
 

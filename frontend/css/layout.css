@@ -263,6 +263,38 @@
   margin-bottom: 0.5rem;
 }
 
+.demo-session-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid hsl(38 92% 50% / 0.35);
+  background: hsl(38 92% 50% / 0.1);
+  font-size: 0.8rem;
+  color: hsl(var(--text-secondary));
+}
+
+.demo-session-banner-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  color: hsl(38 92% 42%);
+}
+
+.demo-session-banner-text {
+  flex: 1 1 200px;
+}
+
+.demo-session-banner-cta {
+  font-weight: 600;
+  color: hsl(var(--primary));
+  white-space: nowrap;
+}
+
 /* Responsive sidebar hides below 768px */
 @media (max-width: 768px) {
   .sidebar {

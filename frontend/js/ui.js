@@ -67,7 +67,7 @@ export const UI = {
   },
 
   // Modal Dialog system
-  modal(title, contentHtml, onSave) {
+  modal(title, contentHtml, onSave, options = {}) {
     const backdrop = document.createElement("div");
     backdrop.className = "modal-backdrop";
     backdrop.style.position = "fixed";
@@ -98,7 +98,7 @@ export const UI = {
       </div>
       <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
         <button class="btn btn-secondary btn-sm close-modal-btn">Cancel</button>
-        <button class="btn btn-primary btn-sm save-modal-btn">Save</button>
+        <button class="btn btn-primary btn-sm save-modal-btn">${options.submitLabel || "Save"}</button>
       </div>
     `;
 

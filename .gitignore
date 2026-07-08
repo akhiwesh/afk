@@ -219,3 +219,6 @@ __marimo__/
 
 # Local AFK runtime database (not source of truth)
 database.db
+
+# Smoke test screenshots (generated)
+scripts/smoke_*.png

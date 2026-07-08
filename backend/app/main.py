@@ -52,6 +52,7 @@ from backend.app.api.intelligence import router as intelligence_router
 from backend.app.api.evidence import router as evidence_router
 from backend.app.api.knowledge import router as knowledge_router
 from backend.app.api.cases import router as cases_router
+from backend.app.api.offer import router as offer_router
 
 # Include API Routers under /api prefix
 app.include_router(auth_router, prefix="/api")
@@ -59,6 +60,7 @@ app.include_router(intelligence_router, prefix="/api")
 app.include_router(evidence_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api")
 app.include_router(cases_router, prefix="/api")
+app.include_router(offer_router, prefix="/api")
 app.include_router(crm_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")

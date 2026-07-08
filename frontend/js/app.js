@@ -4,6 +4,7 @@ import { UI } from "./ui.js";
 
 // Page imports
 import { renderLanding } from "./pages/landing.js";
+import { renderOffer } from "./pages/offer.js";
 import { renderLogin } from "./pages/login.js";
 import { renderRegister } from "./pages/register.js";
 import { renderHealth } from "./pages/health.js";
@@ -38,6 +39,7 @@ class App {
   initRoutes() {
     // Public paths
     AppRouter.addRoute("#", (param) => this.renderPublicView(renderLanding));
+    AppRouter.addRoute("#offer", (param) => this.renderPublicView(renderOffer));
     AppRouter.addRoute("#login", (param) => this.renderPublicView(renderLogin));
     AppRouter.addRoute("#register", (param) => this.renderPublicView(renderRegister));
 
@@ -114,7 +116,10 @@ class App {
           </aside>
 
           <!-- Main workspace sheet -->
-          <main class="main-content" id="workspace-container"></main>
+          <main class="main-content">
+            <div id="demo-banner-host"></div>
+            <div id="workspace-container"></div>
+          </main>
         </div>
       `;
       layoutEl = this.appMountNode.querySelector(".dashboard-layout");
@@ -128,6 +133,7 @@ class App {
         }
         localStorage.removeItem("access_token");
         localStorage.removeItem("user_profile");
+        localStorage.removeItem("afk_demo_session");
         UI.toast("Signed out successfully.", "success");
         window.dispatchEvent(new Event("auth-changed"));
         AppRouter.navigate("#");
@@ -158,6 +164,8 @@ class App {
     // Revenue clarity checklist (evidence → audit → diagnosis)
     this.renderOnboardingChecklist(layoutEl);
 
+    this.renderDemoBanner(layoutEl, user);
+
     // Render inside the nested workspace container
     const workspaceContainer = layoutEl.querySelector("#workspace-container");
     renderFn(workspaceContainer);
@@ -185,6 +193,26 @@ class App {
     } catch {
       host.innerHTML = "";
     }
+  }
+
+  isDemoSession(user) {
+    return localStorage.getItem("afk_demo_session") === "true"
+      || (user && user.email === "demo@afk.agency");
+  }
+
+  renderDemoBanner(layoutEl, user) {
+    const host = layoutEl.querySelector("#demo-banner-host");
+    if (!host) return;
+    if (!this.isDemoSession(user)) {
+      host.innerHTML = "";
+      return;
+    }
+    host.innerHTML = `
+      <div class="demo-session-banner" role="status">
+        <span class="demo-session-banner-label">Demo session</span>
+        <span class="demo-session-banner-text">Sample data for Meridian Growth Co. — create your own org when you are ready.</span>
+                <a href="#offer" class="demo-session-banner-cta">View diagnostic offer</a>
+      </div>`;
   }
 
   handleAuthChange() {
