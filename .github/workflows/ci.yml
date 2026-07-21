@@ -1,0 +1,22 @@
+name: AFK CI
+on: [push, pull_request]
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install
+        run: pip install -r backend/requirements.txt
+      - name: "Gate 1 - Knowledge base validates"
+        run: python -c "from backend.app.knowledge_engine.registry import load_registry; print(load_registry().stats())"
+      - name: "Gate 2 - Full test suite"
+        run: python -m pytest backend/tests/ -q
+      - name: "Gate 3 - App boots and serves health"
+        run: |
+          python -c "
+          import threading, time, urllib.request, uvicorn
+          from backend.app.main import app
+          t=threading.Thread(target=lambda: uvicorn.run(app,host='127.0.0.1',port=8099,log_level='error'),daemon=True); t.start(); time.sleep(6)
+          assert urllib.request.urlopen('http://127.0.0.1:8099/api/health').status==200; print('boot OK')"
