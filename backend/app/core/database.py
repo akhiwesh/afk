@@ -6,6 +6,9 @@ from typing import Generator
 DB_FILE = "database.db"
 # Set database URL dynamically based on environment, default to local SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_FILE}")
+# Render provides postgres:// but SQLAlchemy 2.x requires postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # SQLite specific argument connect_args={"check_same_thread": False} is required
 # when running multiple threads in FastAPI.
