@@ -3,8 +3,8 @@ from backend.app.knowledge_engine.validation_framework import score_case_replay,
 from backend.app.knowledge_engine.registry import load_registry
 
 
-def test_cas_0001_scorecard_with_evidence_agrees():
-    case = load_registry().get("AFK-CAS-0001")
+def test_cas_0003_scorecard_with_evidence_agrees():
+    case = load_registry().get("AFK-CAS-0003")
     result = score_case_replay(case)
     assert result["protocol_id"] == "AFK-VAL-0001"
     assert result["checks"]["primary_evidence_agreement"] is True
