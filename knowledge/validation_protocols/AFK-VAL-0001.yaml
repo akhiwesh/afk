@@ -41,9 +41,6 @@ relationships:
 - type: requires
   target: AFK-PRI-0001
   confidence: hypothesized
-- type: requires
-  target: AFK-CAS-0001
-  confidence: hypothesized
 todos:
 - 'TODO(operations): ingest 9 more founder-approved cases before calibration pass/fail gate.'
 created:
