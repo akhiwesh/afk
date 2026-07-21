@@ -789,7 +789,7 @@
 [data-theme="dark"] .diag-select {
   background: var(--diag-surface);
   border-color: var(--diag-border-subtle);
-  color: var(--diag-text-primary);
+  color: var(--diag-text-primary);Fix theme conflict: scope light-canvas overrides for shell tokens (WCAG AA)
 }
 
 /* Dark app shell: diagnostic canvas stays light (Mercury/Stripe report pattern) */
@@ -839,3 +839,5 @@
 [data-theme="dark"] .diag-section-label {
   color: var(--diag-amber-dark);
 }
+
+.diag-page{--bg-app:210 40% 96%;--bg-card:0 0% 100%;--bg-subtle:210 40% 94%;--bg:0 0% 100%;--border:215 25% 72%;--border-focus:221 83% 45%;--text-muted:215 25% 33%;--text-primary:222 47% 11%;--prim
