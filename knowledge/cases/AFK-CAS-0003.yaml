@@ -1,0 +1,72 @@
+id: AFK-CAS-0003
+type: case_study
+name: 'Case 0003: Synthetic divergence fixture (distribution shape)'
+version: 1.0.0
+status: hypothesis
+owner: chief_pattern_scientist
+description: SYNTHETIC validation fixture — not a real business. Divergence-shaped data (recorded
+  primary pricing vs base-replay primary conversion) retained solely to exercise AFK-VAL-0001 replay
+  and evidence-adjunct reconciliation paths. Data shape derived from a deleted fabricated case; every
+  number here is test fixture material, never an observation.
+created:
+  by: Founding CTO
+  date: '2026-07-21'
+  reason: Replace fabricated AFK-CAS-0001 (deleted per founder order) with an honestly-labeled synthetic
+    fixture so the replay/scorecard machinery keeps its divergence-path coverage without epistemic fraud.
+synthetic: true
+business_profile:
+  business_type: Distribution / trading
+  industry: Synthetic fixture — distribution shape
+  growth_stage: Growing (repeatable sales)
+  team_band: null
+  revenue_band: null
+  revenue_model: Mixed
+observation:
+  health_score: 78
+  risk_level: Low Risk
+  confidence: 0.91
+  primary_constraint: Pricing & Monetization
+  capture_selection_method: min_score
+  capture_note: Fixture reproduces the Loop-4 divergence pattern — min_score selection records pricing
+    (55) while base AFK-PRI-0001 replay ranks conversion (65) first; with avg_discount_pct 6.1% the
+    evidence adjunct ranks pricing first.
+  dimension_scores:
+    pricing: 55
+    conversion: 65
+    demand: 80
+    retention: 85
+    founder_dependency: 85
+    qualification: 100
+computed_metrics:
+  avg_order_value:
+    value: 166559
+  avg_discount_pct:
+    value: 6.1
+  avg_monthly_revenue:
+    value: 3497743
+  repeat_customer_rate:
+    value: 100
+  lead_count:
+    value: 72
+  lead_conversion_pct:
+    value: 68.4
+contradictions:
+- belief_question: '% of customers who buy again / renew'
+  belief_answer: 62%
+  evidence_metric: repeat_customer_rate
+  evidence_value: 100
+  severity: significant
+- belief_question: Average deal / order value (₹)
+  belief_answer: ₹95,000
+  evidence_metric: avg_order_value
+  evidence_value: 166559
+  severity: significant
+evidence_summary:
+  kinds:
+    invoices: 85
+    transactions: 167
+    leads: 72
+  audit_completeness: 1
+outcome:
+  status: not_yet_observed
+  note: Synthetic fixture — no outcome will ever be observed; excluded from calibration counts.
