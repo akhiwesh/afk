@@ -81,10 +81,10 @@ def test_PARITY_registry_matches_running_engine():
     assert sample["model_id"] == pri["id"]
 
 
-def test_cas_0001_calibration_probe_without_evidence_metrics():
+def test_cas_0003_calibration_probe_without_evidence_metrics():
     """Base PRI-0001 diverges from recorded primary — documents the gap."""
     r = load_registry()
-    case = r.get("AFK-CAS-0001")
+    case = r.get("AFK-CAS-0003")
     replay = replay_priority_from_observation(case["observation"])
     assert replay["replayable"]
     assert replay["recorded_primary"] == "Pricing & Monetization"
@@ -94,10 +94,10 @@ def test_cas_0001_calibration_probe_without_evidence_metrics():
     assert replay["divergence"]
 
 
-def test_cas_0001_calibration_probe_with_invoice_metrics_aligns():
+def test_cas_0003_calibration_probe_with_invoice_metrics_aligns():
     """Evidence adjunct reconciles N=1 case when stored invoice metrics are replayed."""
     r = load_registry()
-    case = r.get("AFK-CAS-0001")
+    case = r.get("AFK-CAS-0003")
     metrics = {
         "avg_discount_pct": case["computed_metrics"]["avg_discount_pct"],
     }
