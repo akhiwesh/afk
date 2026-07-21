@@ -38,7 +38,7 @@ evidence_adjunct:
     slope: 2.0
     cap: 2.0
     formula: 'exposure_multiplier = 1 + min(cap, (avg_discount_pct − threshold) / slope) when metric from uploaded invoices'
-    provenance: operator_judgment slope calibrated against AFK-CAS-0001 at 6.1% discount (N=1)
+    provenance: operator_judgment; slope uncalibrated — no real cases exist yet (fabricated calibration reference removed 2026-07-21)
     applies_only_when: uploaded invoice evidence present — never from self-report alone
   retention_repeat_exposure:
     trigger_metric: repeat_customer_rate
