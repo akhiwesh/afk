@@ -142,3 +142,10 @@
 - KB-compiled detection rules (Phase B engine migration)
 - Industry-specific exposure tables
 - V4 audit question migration (AFK-AUD-0001 phases b–d)
+
+## 2026-07-21 — Integrity restoration + delivery pipeline
+- Fixed theme conflict: light-canvas token overrides (WCAG AA) for legacy components.
+- Removed fabricated case study AFK-CAS-0001 and its dangling KB references.
+- Added honest synthetic fixture AFK-CAS-0003 (synthetic: true); repointed dependent tests.
+- Added CI: knowledge-base validation, full test suite, boot check on every push.
+- Enabled durable Postgres via DATABASE_URL (Render); persistence verified by marker-account redeploy test.
