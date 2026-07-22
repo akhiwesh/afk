@@ -841,3 +841,12 @@
 }
 
 .diag-page{--bg-app:210 40% 96%;--bg-card:0 0% 100%;--bg-subtle:210 40% 94%;--bg:0 0% 100%;--border:215 25% 72%;--border-focus:221 83% 45%;--text-muted:215 25% 33%;--text-primary:222 47% 11%;--prim
+
+/* Staged reveal + revenue-engine flow (2026-07-21 diagnosis redesign) */
+.diag-reveal { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes diagFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes diagFlow { to { stroke-dashoffset: -24; } }
+  .diag-reveal { opacity: 0; animation: diagFadeUp .55s cubic-bezier(.16,.84,.44,1) forwards; animation-delay: var(--d, 0s); }
+  .diag-flow { stroke-dasharray: 7 7; animation: diagFlow 1.6s linear infinite; }
+}
