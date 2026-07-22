@@ -880,6 +880,22 @@ def compute_constraint_priority(
     return result
 
 
+_CONSTRAINT_VERDICT = {
+    "demand": "Not enough qualified demand is reaching you — everything downstream is capped by the top of the funnel.",
+    "qualification": "Demand arrives, but selling time is going to the wrong leads before anyone gets close to buying.",
+    "conversion": "Serious interest is reaching you and then dying in follow-up — revenue is leaking at the point of sale.",
+    "pricing": "Money reaches you and then leaks at the point of sale. Value created is not being captured.",
+    "retention": "You win customers and lose them — growth spend is refilling a leaking bucket.",
+    "founder_dependency": "Revenue depends on you personally, so throughput is capped by your hours rather than by demand.",
+}
+
+
+def _verdict_line(key: str, label: str) -> str:
+    """One plain sentence naming what is wrong. Deterministic, from the
+    constraint library — never generated."""
+    return _CONSTRAINT_VERDICT.get(key, f"Your primary constraint is {label}.")
+
+
 def _select_primary_constraint(
     scored: list[dict],
     evidence_adjustments: dict[str, dict] | None = None,
@@ -1051,6 +1067,7 @@ def compute_health(
         "primary_constraint": {
             "key": primary["key"],
             "label": primary["label"],
+            "one_liner": _verdict_line(primary["key"], primary["label"]),
             "score": primary["score"],
             "confidence": primary["confidence"],
             "findings": primary["findings"],
