@@ -296,26 +296,45 @@ export async function renderHealth(container) {
 
   const CHAIN_ORDER = ["demand", "qualification", "conversion", "pricing", "retention", "founder_dependency"];
   const chainDims = CHAIN_ORDER.map(k => h.dimensions.find(d => d.key === k)).filter(Boolean);
-  const chainBlock = chainDims.length ? `
+  const chainBlock = chainDims.length ? (() => {
+    const pcKey = pc.key;
+    const W = 680, cy = 92, n = chainDims.length;
+    const step = (W - 100) / (n - 1);
+    const nodes = chainDims.map((d, i) => ({
+      d, x: Math.round(50 + i * step),
+      r: d.key === pcKey ? 30 : 25,
+      sc: d.score,
+      flow: d.score === null ? 6 : Math.max(4, Math.round((d.score / 100) * 26)),
+      hue: d.score === null ? "#94a3b8" : d.score >= 70 ? "#1D9E75" : d.score >= 50 ? "#EF9F27" : "#E24B4A",
+    }));
+    const pipes = nodes.slice(0, -1).map((nd, i) => {
+      const nx = nodes[i + 1];
+      const th = Math.max(4, Math.min(nd.flow, nx.flow));
+      return `<path class="diag-flow" d="M${nd.x} ${cy} H${nx.x}" stroke="${nx.hue}" stroke-width="${th}" fill="none" opacity="0.3" stroke-linecap="round"/>`;
+    }).join("");
+    const circles = nodes.map(nd => {
+      const isPc = nd.d.key === pcKey;
+      return `<circle cx="${nd.x}" cy="${cy}" r="${nd.r}" fill="${nd.hue}" fill-opacity="${nd.sc === null ? 0.12 : 0.16}" stroke="${nd.hue}" stroke-width="${isPc ? 2 : 1}"/>`
+        + `<text x="${nd.x}" y="${cy}" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;fill:var(--diag-text-primary);font-variant-numeric:tabular-nums;">${nd.sc ?? "\u2014"}</text>`
+        + `<text x="${nd.x}" y="${cy + nd.r + 20}" text-anchor="middle" style="font-size:12px;fill:var(--diag-text-secondary);">${nd.d.label.split(" ")[0]}</text>`
+        + (isPc ? `<text x="${nd.x}" y="${cy + nd.r + 36}" text-anchor="middle" style="font-size:11px;fill:${nd.hue};">primary constraint</text>` : "");
+    }).join("");
+    const lost = h.revenue_opportunity ? `<text x="0" y="196" style="font-size:12px;fill:var(--diag-amber-dark);">${fmtINR(h.revenue_opportunity.amount)}/yr is the modelled opportunity at this constraint</text>` : "";
+    return `
     <div class="diag-block">
-      ${sectionLabel("Revenue engine chain")}
-      <p class="diag-muted-sm" style="margin-bottom:1.25rem;max-width:68ch;">
-        How money moves through your business — colored by constraint index. Left to right: leads → close → monetize → repeat.
+      ${sectionLabel("Your revenue engine")}
+      <p class="diag-muted-sm" style="margin-bottom:1rem;max-width:68ch;">
+        How money moves through your business, left to right. The pipe narrows where revenue is lost \u2014 the narrowest point is your constraint.
       </p>
-      <div class="diag-chain">
-        ${chainDims.map((d, i) => {
-          const sc = d.score;
-          const bg = dimScoreColor(sc);
-          const short = d.label.split(" ")[0];
-          return `${i > 0 ? `<span class="diag-muted" style="font-size:0.75rem;">→</span>` : ""}
-            <div class="diag-chain-node" title="${d.label}: ${sc ?? "—"}/100">
-              <div class="diag-chain-box" style="background:${bg};opacity:${sc === null ? 0.35 : 1};"></div>
-              <div class="diag-stat-label" style="margin-top:0.3rem;line-height:1.2;">${short}</div>
-              <div style="font-size:0.72rem;font-weight:600;font-variant-numeric:tabular-nums;">${sc ?? "—"}</div>
-            </div>`;
-        }).join("")}
-      </div>
-    </div>` : "";
+      <svg width="100%" viewBox="0 0 680 210" role="img" style="overflow:visible;">
+        <title>Revenue engine flow</title>
+        <desc>Business systems in sequence; flow thickness reflects each system score, narrowing at the primary constraint.</desc>
+        ${pipes}${circles}
+        <text x="0" y="176" style="font-size:12px;fill:var(--diag-text-secondary);">Flow thickness = how much revenue survives each stage</text>
+        ${lost}
+      </svg>
+    </div>`;
+  })() : "";
 
   const ranking = h.constraint_priority_ranking || [];
   const rankingBlock = ranking.length ? `
@@ -337,26 +356,24 @@ export async function renderHealth(container) {
   container.innerHTML = `
     <div class="diag-page diag-page--embedded">
     <div class="diag-health-inner">
-      <div class="diag-hero" style="margin-bottom:1.5rem;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
-          <div>
-            <p class="diag-hero-kicker">Executive Diagnosis</p>
-            <h1>Revenue Health</h1>
-            <p>${h.risk_level} · primary constraint ${pc.label}</p>
-          </div>
-          <button type="button" class="diag-btn-secondary" id="health-export-pdf" style="margin-top:0.25rem;flex-shrink:0;">
-            Download PDF
-          </button>
-        </div>
+      <div class="diag-reveal" style="--d:0s;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:0.25rem;">
+        <p class="diag-hero-kicker" style="margin:0;">Executive Diagnosis</p>
+        <button type="button" class="diag-btn-secondary" id="health-export-pdf" style="flex-shrink:0;">Download PDF</button>
       </div>
 
-      <div class="diag-hero-score">
-        ${renderGauge(h.health_score)}
-        <div>
-          <span class="diag-status-pill ${hs.cls}" style="margin-bottom:0.75rem;display:inline-block;">${hs.label}</span>
-          ${provenance}
-          ${changesBlock}
-        </div>
+      <div class="diag-reveal" style="--d:.1s;display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin:0.25rem 0 0.5rem;">
+        <span style="font-size:4rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;">${h.health_score}</span>
+        <span style="font-size:1.1rem;" class="diag-muted">/ 100</span>
+        <span class="diag-status-pill ${hs.cls}">${hs.label}</span>
+      </div>
+
+      <p class="diag-reveal" style="--d:.2s;font-size:1.05rem;line-height:1.65;max-width:56ch;margin:0 0 1.75rem;">
+        ${pc.one_liner || "Your primary constraint is " + pc.label + "."}
+      </p>
+
+      <div class="diag-reveal" style="--d:.3s;">
+        ${provenance}
+        ${changesBlock}
       </div>
 
       ${evidenceCtaPanel(pc, h.missing_evidence)}
