@@ -74,7 +74,7 @@ def parse_file(filename: str, content: bytes) -> list[list[str]]:
         rows = []
         for row in ws.iter_rows(values_only=True):
             rows.append(["" if c is None else str(c).strip() for c in row])
-            if len(rows) >= 5001:
+            if len(rows) >= 50001:
                 break
         wb.close()
     elif name.endswith((".csv", ".txt", ".tsv")):
@@ -85,7 +85,7 @@ def parse_file(filename: str, content: bytes) -> list[list[str]]:
         delimiter = "\t" if name.endswith(".tsv") or "\t" in text.splitlines()[0] else ","
         reader = csv.reader(io.StringIO(text), delimiter=delimiter)
         rows = [[c.strip() for c in r] for r in reader]
-        rows = rows[:5001]
+        rows = rows[:50001]
     else:
         raise ValueError("Unsupported file type. Upload a .csv, .tsv, or .xlsx file.")
 
