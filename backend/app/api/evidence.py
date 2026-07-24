@@ -21,7 +21,7 @@ from backend.app.bse.projection import diagnosis_memory_payload
 
 router = APIRouter(prefix="/intelligence/evidence", tags=["evidence"])
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB is plenty for 5k rows
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB — decision-makers dump years of data
 
 
 class ConfirmPayload(BaseModel):
@@ -44,7 +44,7 @@ async def upload_evidence(
 ):
     content = await file.read()
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="File too large (5 MB max for now)")
+        raise HTTPException(status_code=413, detail="File too large (25 MB max — split very large exports)")
     try:
         rows = ev.parse_file(file.filename or "upload.csv", content)
     except ValueError as e:
