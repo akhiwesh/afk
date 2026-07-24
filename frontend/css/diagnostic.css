@@ -850,3 +850,12 @@
   .diag-reveal { opacity: 0; animation: diagFadeUp .55s cubic-bezier(.16,.84,.44,1) forwards; animation-delay: var(--d, 0s); }
   .diag-flow { stroke-dasharray: 7 7; animation: diagFlow 1.6s linear infinite; }
 }
+
+/* Live diagnosis panel — audit page reacts as you answer (2026-07-24) */
+.diag-live-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 1.75rem; align-items: start; }
+.diag-live { background: var(--diag-surface); border: 1px solid var(--diag-border); border-radius: 12px;
+  padding: 1rem 1.1rem; position: sticky; top: 1.5rem; }
+@media (max-width: 900px) {
+  .diag-live-grid { grid-template-columns: minmax(0, 1fr); }
+  .diag-live { position: static; }
+}
