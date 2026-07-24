@@ -62,6 +62,74 @@ def compute_metrics(records_by_kind: dict[str, list[dict]]) -> dict:
                 "basis": f"{repeat} of {len(custs)} distinct customers appear on more than one invoice.",
             }
 
+        # --- Metrics that a rich, multi-month dataset unlocks ---
+        # Customer revenue concentration (share from top ~20% of accounts).
+        cust_rev = {}
+        for r in inv_amt:
+            c = (r.get("customer") or "").strip().lower()
+            if c:
+                cust_rev[c] = cust_rev.get(c, 0) + r["amount"]
+        if len(cust_rev) >= 5:
+            ranked = sorted(cust_rev.values(), reverse=True)
+            top_n = max(1, round(len(ranked) * 0.2))
+            share = 100 * sum(ranked[:top_n]) / sum(ranked)
+            m["revenue_concentration_pct"] = {
+                "value": round(share, 1),
+                "basis": f"Top {top_n} of {len(cust_rev)} customers ({round(100*top_n/len(cust_rev))}%) account for this share of revenue.",
+            }
+
+        # Revenue trend: compare first vs last third of the months present.
+        if len(by_month) >= 4:
+            months = sorted(by_month)
+            third = max(1, len(months) // 3)
+            early = sum(by_month[k] for k in months[:third]) / third
+            late = sum(by_month[k] for k in months[-third:]) / third
+            if early > 0:
+                chg = 100 * (late - early) / early
+                m["revenue_trend_pct"] = {
+                    "value": round(chg, 1),
+                    "basis": f"Average monthly revenue in the last {third} month(s) vs the first {third}, across {len(months)} months of data.",
+                }
+
+        # Seasonality: peak vs trough month.
+        if len(by_month) >= 6:
+            vals = sorted(by_month.items(), key=lambda kv: kv[1])
+            low_k, low_v = vals[0]
+            high_k, high_v = vals[-1]
+            if low_v > 0:
+                m["seasonality_swing_pct"] = {
+                    "value": round(100 * (high_v - low_v) / low_v, 1),
+                    "basis": f"Best month ({high_k}) vs weakest ({low_k}) across {len(by_month)} months of invoices.",
+                }
+
+        # Dormant accounts: customers with no invoice in the most recent 90 days
+        # of the dataset's own timeline (not wall-clock — respects the file).
+        dated = [r for r in inv_amt if r.get("date")]
+        if len(cust_rev) >= 5 and len(dated) >= 10:
+            latest = max(r["date"] for r in dated)
+            from datetime import date as _d
+            try:
+                ly, lm, ld = (int(x) for x in latest.split("-"))
+                cutoff_ord = _d(ly, lm, ld).toordinal() - 90
+                last_seen = {}
+                for r in dated:
+                    c = (r.get("customer") or "").strip().lower()
+                    if c:
+                        last_seen[c] = max(last_seen.get(c, ""), r["date"])
+                dormant = 0
+                for c, dt in last_seen.items():
+                    y, mo, dd = (int(x) for x in dt.split("-"))
+                    if _d(y, mo, dd).toordinal() < cutoff_ord:
+                        dormant += 1
+                if last_seen:
+                    m["dormant_customer_pct"] = {
+                        "value": round(100 * dormant / len(last_seen), 1),
+                        "basis": f"{dormant} of {len(last_seen)} customers have no invoice in the last 90 days of your data (latest: {latest}).",
+                    }
+            except (ValueError, AttributeError):
+                pass
+
+
     leads = records_by_kind.get("leads", [])
     if leads:
         m["lead_count"] = {"value": len(leads), "basis": f"{len(leads)} lead records uploaded."}
