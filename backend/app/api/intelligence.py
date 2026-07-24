@@ -359,6 +359,44 @@ def save_audit_module(
     }
 
 
+class LivePreviewPayload(BaseModel):
+    answers: dict
+
+
+@router.post("/audit/live-preview")
+def live_preview(payload: LivePreviewPayload, db: Session = Depends(get_session),
+                 current_user: User = Depends(get_current_user)):
+    """Compute the diagnosis from saved answers merged with in-progress
+    (unsaved) answers. Powers the live panel that updates as the founder
+    answers — same deterministic engine, nothing estimated, nothing stored."""
+    saved = _get_answers(db, current_user.organization_id)
+    merged = {**saved, **{k: v for k, v in (payload.answers or {}).items() if v not in (None, "")}}
+
+    health = ce.compute_health(merged)
+    answered = sum(1 for q in ce.QUESTIONS if merged.get(q["id"]) not in (None, ""))
+
+    dims = [{"key": d["key"], "label": d["label"], "score": d["score"],
+             "coverage": round(d.get("coverage", 0), 2)}
+            for d in health.get("dimensions", [])]
+
+    if not health.get("sufficient"):
+        return {"sufficient": False, "answered": answered, "total": len(ce.QUESTIONS),
+                "dimensions": dims,
+                "message": health.get("message", "Not enough evidence yet — keep going."),
+                "needed": health.get("missing_summary", [])[:3]}
+
+    pc = health["primary_constraint"]
+    return {
+        "sufficient": True, "answered": answered, "total": len(ce.QUESTIONS),
+        "health_score": health["health_score"],
+        "risk_level": health["risk_level"],
+        "confidence": health.get("confidence"),
+        "primary_constraint": {"key": pc["key"], "label": pc["label"],
+                               "one_liner": pc.get("one_liner"), "score": pc.get("score")},
+        "dimensions": dims,
+    }
+
+
 @router.get("/audit")
 def get_audit(db: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     answers = _get_answers(db, current_user.organization_id)
