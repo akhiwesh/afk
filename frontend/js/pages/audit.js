@@ -231,6 +231,60 @@ async function runAnalysisSequence(container) {
   await wait(1200);
 }
 
+function renderLivePanel(lp) {
+  if (!lp) return `<div class="diag-live" id="live-panel"><span class="diag-muted" style="font-size:0.8rem;">Answer a question to see your engine react.</span></div>`;
+  const pct = Math.round((lp.answered / lp.total) * 100);
+  const bar = (lp.dimensions || []).map(d => {
+    const sc = d.score;
+    const hue = sc === null ? "#94a3b8" : sc >= 70 ? "#1D9E75" : sc >= 50 ? "#EF9F27" : "#E24B4A";
+    const w = sc === null ? Math.max(6, Math.round((d.coverage || 0) * 100)) : sc;
+    const isPc = lp.primary_constraint && d.key === lp.primary_constraint.key;
+    return `<div style="display:grid;grid-template-columns:104px 1fr 30px;gap:8px;align-items:center;margin:5px 0;">
+      <span style="font-size:0.72rem;${isPc ? "font-weight:600;" : ""}" class="${isPc ? "" : "diag-muted"}">${d.label.split(" ")[0]}</span>
+      <span style="height:5px;border-radius:3px;background:var(--diag-border-subtle);display:block;overflow:hidden;">
+        <span style="display:block;height:100%;width:${w}%;background:${hue};transition:width .5s cubic-bezier(.16,.84,.44,1);opacity:${sc === null ? .35 : 1};"></span>
+      </span>
+      <span style="font-size:0.72rem;font-variant-numeric:tabular-nums;text-align:right;">${sc == null ? "\u2014" : sc}</span>
+    </div>`;
+  }).join("");
+  const head = lp.sufficient ? `
+      <div style="display:flex;align-items:baseline;gap:8px;">
+        <span style="font-size:2.4rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;">${lp.health_score}</span>
+        <span class="diag-muted" style="font-size:0.8rem;">/ 100 · ${lp.risk_level}</span>
+      </div>
+      <p style="font-size:0.82rem;line-height:1.5;margin:.4rem 0 .75rem;">${lp.primary_constraint && lp.primary_constraint.one_liner ? lp.primary_constraint.one_liner : ""}</p>`
+    : `<p style="font-size:0.82rem;line-height:1.5;margin:0 0 .75rem;" class="diag-muted">${lp.message || "Keep going \u2014 the engine will not guess."}</p>`;
+  return `<div class="diag-live" id="live-panel">
+      <div class="diag-result-kicker" style="margin-bottom:.5rem;">Live diagnosis · ${lp.answered}/${lp.total} answered (${pct}%)</div>
+      ${head}${bar}
+      <p class="diag-muted" style="font-size:0.68rem;margin-top:.6rem;line-height:1.4;">Recomputed by the deterministic engine on every change.</p>
+    </div>`;
+}
+
+function collectAnswers(container) {
+  const out = {};
+  container.querySelectorAll("[data-q]").forEach(el => {
+    const id = el.dataset.q;
+    if (el.classList.contains("diag-choices")) {
+      const sel = el.querySelector(".diag-choice.is-selected");
+      if (sel) out[id] = sel.dataset.value;
+    } else if (el.value !== undefined && el.value !== "") {
+      out[id] = el.value;
+    }
+  });
+  return out;
+}
+
+async function refreshLivePanel(container) {
+  const host = container.querySelector("#live-panel");
+  if (!host) return;
+  try {
+    const lp = await API.post("/intelligence/audit/live-preview", { answers: collectAnswers(container) });
+    const fresh = container.querySelector("#live-panel");
+    if (fresh) fresh.outerHTML = renderLivePanel(lp);
+  } catch (e) { }
+}
+
 export async function renderAudit(container, startModuleId = null) {
   container.innerHTML = `<div class="diag-page"><div class="diag-inner" style="padding:3rem 0;text-align:center;"><span class="diag-muted">Loading diagnostic…</span></div></div>`;
 
@@ -293,8 +347,12 @@ export async function renderAudit(container, startModuleId = null) {
           ${state.systems_complete === state.systems_total && state.diagnosis_preview ? renderDiagnosisPreview(state.diagnosis_preview) : ""}
 
           ${showingPayoff && lastPayoff ? renderPayoff(lastPayoff, showBreakdown) : `
-            <div>${questions}${optionalBlock}</div>
-            ${mod.evidence_hint ? `<p class="diag-hint">💡 ${mod.evidence_hint}</p>` : ""}
+            <div class="diag-live-grid">
+              <div>${questions}${optionalBlock}
+                ${mod.evidence_hint ? `<p class="diag-hint">💡 ${mod.evidence_hint}</p>` : ""}
+              </div>
+              ${renderLivePanel(null)}
+            </div>
           `}
 
           <div class="diag-actions">
@@ -311,6 +369,17 @@ export async function renderAudit(container, startModuleId = null) {
       </div>`;
 
     wireInteractions(container, state, render);
+
+    if (!showingPayoff) {
+      refreshLivePanel(container);
+      let lpT = null;
+      const ping = () => { clearTimeout(lpT); lpT = setTimeout(() => refreshLivePanel(container), 350); };
+      container.querySelectorAll("[data-q]").forEach(el => {
+        el.addEventListener("click", ping);
+        el.addEventListener("input", ping);
+        el.addEventListener("change", ping);
+      });
+    }
 
     container.querySelectorAll("[data-goto]").forEach(btn => {
       btn.addEventListener("click", () => {
