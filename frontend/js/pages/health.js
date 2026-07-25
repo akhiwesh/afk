@@ -434,18 +434,18 @@ export async function renderHealth(container) {
         };
         const rows = Object.keys(LABELS).filter(k => em[k]).map(k => {
           const [label, fmt] = LABELS[k];
-          return \`<div class="diag-mini-card">
-            <div class="diag-stat-label" style="margin-bottom:0.3rem;">\${label}</div>
-            <div style="font-weight:600;font-size:1.05rem;">\${fmt(em[k].value)}</div>
-            <div class="diag-stat-label" style="margin-top:0.35rem;line-height:1.35;">\${em[k].basis}</div>
-          </div>\`;
+          return `<div class="diag-mini-card">
+            <div class="diag-stat-label" style="margin-bottom:0.3rem;">${label}</div>
+            <div style="font-weight:600;font-size:1.05rem;">${fmt(em[k].value)}</div>
+            <div class="diag-stat-label" style="margin-top:0.35rem;line-height:1.35;">${em[k].basis}</div>
+          </div>`;
         }).join("");
-        return rows ? \`
+        return rows ? `
       <div class="diag-block">
-        \${sectionLabel("What your data reveals")}
+        ${sectionLabel("What your data reveals")}
         <p class="diag-muted-sm" style="margin-bottom:1rem;max-width:68ch;">Measured directly from your uploaded files — computed, never asked. The more you upload, the more appears here.</p>
-        <div class="diag-card-grid">\${rows}</div>
-      </div>\` : "";
+        <div class="diag-card-grid">${rows}</div>
+      </div>` : "";
       })()}
 
       ${(h.revenue_drivers || []).length ? `
