@@ -418,6 +418,36 @@ export async function renderHealth(container) {
           </div>`).join("")}
       </div>` : ""}
 
+      ${(() => {
+        const em = h.evidence_metrics || {};
+        const LABELS = {
+          avg_order_value: ["Average order value", v => fmtINR(v)],
+          avg_monthly_revenue: ["Average monthly revenue", v => fmtINR(v)],
+          avg_discount_pct: ["Average discount", v => v + "%"],
+          repeat_customer_rate: ["Repeat customers", v => v + "%"],
+          revenue_concentration_pct: ["Revenue concentration", v => v + "%"],
+          revenue_trend_pct: ["Revenue trend", v => (v >= 0 ? "+" : "") + v + "%"],
+          seasonality_swing_pct: ["Seasonal swing", v => v + "%"],
+          dormant_customer_pct: ["Dormant customers", v => v + "%"],
+          lead_conversion_pct: ["Lead conversion", v => v + "%"],
+          top_lead_source: ["Top lead source", v => v],
+        };
+        const rows = Object.keys(LABELS).filter(k => em[k]).map(k => {
+          const [label, fmt] = LABELS[k];
+          return \`<div class="diag-mini-card">
+            <div class="diag-stat-label" style="margin-bottom:0.3rem;">\${label}</div>
+            <div style="font-weight:600;font-size:1.05rem;">\${fmt(em[k].value)}</div>
+            <div class="diag-stat-label" style="margin-top:0.35rem;line-height:1.35;">\${em[k].basis}</div>
+          </div>\`;
+        }).join("");
+        return rows ? \`
+      <div class="diag-block">
+        \${sectionLabel("What your data reveals")}
+        <p class="diag-muted-sm" style="margin-bottom:1rem;max-width:68ch;">Measured directly from your uploaded files — computed, never asked. The more you upload, the more appears here.</p>
+        <div class="diag-card-grid">\${rows}</div>
+      </div>\` : "";
+      })()}
+
       ${(h.revenue_drivers || []).length ? `
       <div class="diag-block">
         ${sectionLabel("What's working")}
