@@ -140,3 +140,43 @@ def test_health_reflects_evidence_after_upload(client: TestClient):
     # Analyst (deterministic) surfaces the contradiction
     a = client.post("/api/intelligence/analyst", json={"question": "Is my pricing fine?"}, headers=h).json()
     assert "contradicts" in a["answer"]
+
+
+def test_rich_dataset_metrics_are_computed_and_honest():
+    """Large multi-month datasets unlock concentration, trend, seasonality,
+    dormancy — each with a basis, none invented."""
+    import random
+    from backend.app.core import evidence_intel as evi
+    random.seed(11)
+    custs = [f"C{i}" for i in range(30)]
+    recs = []
+    for mo in range(1, 19):
+        y, m = 2025 + (mo - 1) // 12, ((mo - 1) % 12) + 1
+        season = 0.6 if m in (6, 7) else 1.0
+        for _ in range(int(40 * season)):
+            c = random.choices(custs, weights=[10] * 5 + [2] * 25)[0]
+            if c in custs[-5:] and mo > 10:
+                continue
+            amt = round(random.uniform(30000, 90000) * (1 + mo * 0.04))
+            recs.append({"customer": c, "amount": float(amt),
+                         "date": f"{y}-{m:02d}-15", "discount": float(round(amt * 0.1))})
+    m = evi.compute_metrics({"invoices": recs})
+    for key in ["revenue_concentration_pct", "revenue_trend_pct",
+                "seasonality_swing_pct", "dormant_customer_pct"]:
+        assert key in m, f"{key} not computed"
+        assert m[key]["basis"]
+        assert isinstance(m[key]["value"], (int, float))
+    assert m["dormant_customer_pct"]["value"] > 0
+    assert m["revenue_trend_pct"]["value"] > 0
+
+
+def test_small_dataset_does_not_fabricate_rich_metrics():
+    """A tiny file must NOT produce concentration/trend/seasonality — those
+    require enough data to be real."""
+    from backend.app.core import evidence_intel as evi
+    tiny = [{"customer": "A", "amount": 1000.0, "date": "2026-01-01"},
+            {"customer": "B", "amount": 2000.0, "date": "2026-01-02"}]
+    m = evi.compute_metrics({"invoices": tiny})
+    assert "revenue_concentration_pct" not in m
+    assert "seasonality_swing_pct" not in m
+    assert "revenue_trend_pct" not in m
