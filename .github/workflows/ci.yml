@@ -20,3 +20,18 @@ jobs:
           from backend.app.main import app
           t=threading.Thread(target=lambda: uvicorn.run(app,host='127.0.0.1',port=8099,log_level='error'),daemon=True); t.start(); time.sleep(6)
           assert urllib.request.urlopen('http://127.0.0.1:8099/api/health').status==200; print('boot OK')"
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: "Gate 4 - Frontend JS parses (catches duplicate declarations, syntax errors)"
+        run: |
+          fail=0
+          for f in $(find frontend/js -name "*.js"); do
+            cp "$f" /tmp/check.mjs
+            if ! node --check /tmp/check.mjs 2>/tmp/syntax_err; then
+              echo "::error file=$f::$(head -1 /tmp/syntax_err)"
+              echo "SYNTAX ERROR in $f:"; cat /tmp/syntax_err
+              fail=1
+            fi
+          done
+          if [ $fail -eq 1 ]; then echo "Frontend syntax check failed"; exit 1; fi
+          echo "All frontend JS files parse cleanly."
