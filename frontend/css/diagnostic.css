@@ -859,3 +859,11 @@
   .diag-live-grid { grid-template-columns: minmax(0, 1fr); }
   .diag-live { position: static; }
 }
+
+/* Evidence pre-fill banner — data proposes an answer, founder confirms (2026-07-24) */
+.diag-prefill { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.5rem 0 0.75rem;
+  padding: 0.5rem 0.7rem; background: rgba(29, 158, 117, 0.08);
+  border: 1px solid rgba(29, 158, 117, 0.25); border-radius: 8px;
+  font-size: 0.82rem; line-height: 1.45; color: var(--diag-text-primary); }
+.diag-prefill-dot { width: 7px; height: 7px; border-radius: 50%; background: #1D9E75;
+  margin-top: 0.4rem; flex-shrink: 0; }
