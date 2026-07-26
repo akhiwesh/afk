@@ -269,20 +269,6 @@ function renderLivePanel(lp) {
     </div>`;
 }
 
-function collectAnswers(container) {
-  const out = {};
-  container.querySelectorAll("[data-q]").forEach(el => {
-    const id = el.dataset.q;
-    if (el.classList.contains("diag-choices")) {
-      const sel = el.querySelector(".diag-choice.is-selected");
-      if (sel) out[id] = sel.dataset.value;
-    } else if (el.value !== undefined && el.value !== "") {
-      out[id] = el.value;
-    }
-  });
-  return out;
-}
-
 async function refreshLivePanel(container) {
   const host = container.querySelector("#live-panel");
   if (!host) return;
