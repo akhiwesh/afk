@@ -42,8 +42,11 @@ function evidenceBadge(q) {
   return `<span class="diag-evidence ${cls}" title="${ev.detail}">Evidence: ${ev.level}</span>`;
 }
 
-function fieldHtml(q, answers, qIndex) {
-  const v = answers[q.id] ?? "";
+function fieldHtml(q, answers, qIndex, prefills) {
+  const pf = (prefills || {})[q.id];
+  // If the founder hasn't answered but evidence measured it, seed the value so
+  // they confirm rather than type. Their own saved answer always wins.
+  const v = (answers[q.id] ?? "") !== "" ? answers[q.id] : (pf ? pf.value : "");
   const num = String(qIndex + 1).padStart(2, "0");
 
   let control = "";
@@ -80,6 +83,11 @@ function fieldHtml(q, answers, qIndex) {
         </div>
         ${evidenceBadge(q)}
       </div>
+      ${pf && (answers[q.id] ?? "") === "" ? `
+        <div class="diag-prefill" data-prefill-for="${q.id}">
+          <span class="diag-prefill-dot"></span>
+          <span>${pf.note} <span class="diag-muted">Confirm or change below.</span></span>
+        </div>` : ""}
       ${control}
     </div>`;
 }
@@ -322,11 +330,11 @@ export async function renderAudit(container, startModuleId = null) {
 
     const requiredQs = mod.questions.filter(q => !q.optional);
     const optionalQs = mod.questions.filter(q => q.optional);
-    const questions = requiredQs.map((q, i) => fieldHtml(q, answers, i)).join("");
+    const questions = requiredQs.map((q, i) => fieldHtml(q, answers, i, mod.prefills)).join("");
     const optionalBlock = optionalQs.length ? `
       <div class="diag-optional-block">
         <div class="diag-optional-kicker">Optional context · AFK-AUD-0001 phase-b</div>
-        ${optionalQs.map((q, i) => fieldHtml(q, answers, requiredQs.length + i)).join("")}
+        ${optionalQs.map((q, i) => fieldHtml(q, answers, requiredQs.length + i, mod.prefills)).join("")}
       </div>` : "";
 
     container.innerHTML = `
