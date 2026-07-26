@@ -287,6 +287,7 @@ def get_audit_module(
             "progress": progress,
         },
         "answers": {q["id"]: answers.get(q["id"]) for q in am.module_questions(module)},
+        "prefills": am.question_prefills(module, metrics),
         "payoff": payoff,
     }
 
