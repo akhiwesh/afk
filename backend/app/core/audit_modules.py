@@ -148,6 +148,48 @@ def module_questions(module: dict) -> list[dict]:
     return out
 
 
+# Which measured metric can pre-fill which audit question, and how to phrase
+# the confirmation. The founder always confirms or corrects — evidence proposes,
+# it never silently overwrites a stated answer.
+_QUESTION_PREFILL = {
+    "avg_deal_value": ("avg_order_value",
+        lambda v: f"Your invoices show an average order value of about \u20b9{int(v):,}."),
+    "repeat_rate": ("repeat_customer_rate",
+        lambda v: f"Your invoices show about {v}% of customers buying more than once."),
+    "discounting": ("avg_discount_pct",
+        lambda v: f"Your invoices show an average discount of about {v}% \u2014 "
+                  + ("that reads as discounting on most deals." if v >= 12
+                     else "that reads as occasional discounting." if v >= 4
+                     else "that reads as rarely discounting."),
+        lambda v: "Most deals" if v >= 12 else "Sometimes" if v >= 4 else "Rarely"),
+}
+
+
+def question_prefills(module: dict, evidence_metrics: dict | None) -> dict:
+    """For each question in this module that measured evidence can answer,
+    return {question_id: {value, note, metric}} so the UI can pre-fill and
+    ask the founder to confirm. Empty when there is no evidence."""
+    if not evidence_metrics:
+        return {}
+    out = {}
+    for q in module_questions(module):
+        mapping = _QUESTION_PREFILL.get(q["id"])
+        if not mapping:
+            continue
+        metric_key, phrase = mapping[0], mapping[1]
+        bucketer = mapping[2] if len(mapping) > 2 else None
+        metric = evidence_metrics.get(metric_key)
+        if metric and metric.get("value") is not None:
+            raw = metric["value"]
+            out[q["id"]] = {
+                "value": bucketer(raw) if bucketer else raw,
+                "note": phrase(raw),
+                "basis": metric.get("basis", ""),
+                "metric": metric_key,
+            }
+    return out
+
+
 def module_progress(module: dict, answers: dict) -> dict:
     qids = module_question_ids(module)
     answered = sum(1 for qid in qids if answers.get(qid) not in (None, ""))
@@ -327,6 +369,7 @@ def list_modules_state(answers: dict, evidence_metrics: dict | None = None) -> d
             "dimensions": module.get("dimensions", []),
             "progress": progress,
             "questions": module_questions(module),
+            "prefills": question_prefills(module, evidence_metrics),
         }
         if progress["complete"]:
             complete_count += 1
