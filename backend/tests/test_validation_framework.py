@@ -15,8 +15,26 @@ def test_cas_0003_scorecard_with_evidence_agrees():
 def test_corpus_not_calibration_ready():
     corpus = score_corpus()
     assert corpus["cases_scored"] >= 2
+    assert corpus["observed_cases_scored"] == 0
+    assert corpus["synthetic_cases_scored"] == corpus["cases_scored"]
     assert corpus["calibration_ready"] is False
-    assert "corpus_mean_agreement" in corpus
+    assert corpus["corpus_mean_agreement"] is None
+
+
+def test_synthetic_cases_never_satisfy_observed_calibration_gate():
+    corpus = score_corpus(["AFK-CAS-0002"] * 10)
+    assert corpus["cases_scored"] == 1
+    assert corpus["observed_cases_scored"] == 0
+    assert corpus["calibration_ready"] is False
+    assert corpus["corpus_mean_agreement"] is None
+
+
+def test_unclassified_case_cannot_count_as_observed():
+    case = dict(load_registry().get("AFK-CAS-0002"))
+    del case["synthetic"]
+    result = score_case_replay(case)
+    assert result["synthetic"] is False
+    assert result["observed"] is False
 
 
 def test_synthetic_case_scored_without_claiming_validation():

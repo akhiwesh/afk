@@ -3,7 +3,6 @@ import { AppRouter } from "./router.js";
 import { UI } from "./ui.js";
 
 // Page imports
-import { renderLanding } from "./pages/landing.js";
 import { renderOffer } from "./pages/offer.js";
 import { renderLogin } from "./pages/login.js";
 import { renderRegister } from "./pages/register.js";
@@ -38,7 +37,7 @@ class App {
 
   initRoutes() {
     // Public paths
-    AppRouter.addRoute("#", (param) => this.renderPublicView(renderLanding));
+    AppRouter.addRoute("#", (param) => this.renderPublicView(renderOffer));
     AppRouter.addRoute("#offer", (param) => this.renderPublicView(renderOffer));
     AppRouter.addRoute("#login", (param) => this.renderPublicView(renderLogin));
     AppRouter.addRoute("#register", (param) => this.renderPublicView(renderRegister));

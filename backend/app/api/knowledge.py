@@ -18,7 +18,7 @@ def kb_stats(current_user: User = Depends(get_current_user)):
 
 @router.get("/validation/corpus")
 def kb_validation_corpus(current_user: User = Depends(get_current_user)):
-    """AFK-VAL-0001 corpus scorecard — descriptive only until N≥10 cases."""
+    """AFK-VAL-0001 corpus scorecard — descriptive until N≥10 observed cases."""
     return score_corpus()
 
 
