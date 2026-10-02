@@ -22,8 +22,8 @@ async def lifespan(app: FastAPI):
     # Shutdown: nothing to clean up yet.
 
 app = FastAPI(
-    title="AFK Growth Platform API",
-    description="Venture-grade AI Growth & Execution Platform backend",
+    title="AFK Revenue Diagnostic API",
+    description="Evidence-based revenue constraint diagnosis for service businesses",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -76,7 +76,7 @@ frontend_dir = os.path.join(base_dir, "frontend")
 # Serve API docs or root router fallback
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "app": "AFK Growth Platform"}
+    return {"status": "ok", "app": "AFK Revenue Diagnostic"}
 
 # If frontend files exist, mount it to the root path.
 # We mount static directory files, but route unknown paths to index.html to support SPA routing!

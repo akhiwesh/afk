@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
+from backend.app.core.time import utcnow
 
 class ClientStatus(str, Enum):
     LEAD = "lead"
@@ -24,7 +25,7 @@ class Client(SQLModel, table=True):
     phone: Optional[str] = None
     status: ClientStatus = Field(default=ClientStatus.LEAD)
     pipeline_stage: PipelineStage = Field(default=PipelineStage.CONTACT)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     organization_id: int = Field(foreign_key="organization.id")
     
@@ -37,7 +38,7 @@ class Client(SQLModel, table=True):
 class ClientNote(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     client_id: int = Field(foreign_key="client.id")
     
@@ -49,7 +50,7 @@ class ClientFile(SQLModel, table=True):
     filename: str
     filepath: str
     file_size: int  # in bytes
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     client_id: int = Field(foreign_key="client.id")
     

@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
+from backend.app.core.time import utcnow
 
 class AIAssistantType(str, Enum):
     MARKETING_STRATEGIST = "marketing_strategist"
@@ -30,7 +31,7 @@ class AIConversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str = Field(index=True)
     assistant_type: AIAssistantType
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     user_id: int = Field(foreign_key="user.id")
     
@@ -41,7 +42,7 @@ class AIMessage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     role: str = Field(index=True)  # "user" or "assistant"
     content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     conversation_id: int = Field(foreign_key="aiconversation.id")
     
@@ -53,7 +54,7 @@ class GeneratedContent(SQLModel, table=True):
     title: str
     content: str
     channel: ContentChannel
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     creator_id: int = Field(foreign_key="user.id")
     

@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 from sqlmodel import SQLModel, Field, Relationship
+from backend.app.core.time import utcnow
 
 class InvoiceStatus(str, Enum):
     DRAFT = "draft"
@@ -15,7 +16,7 @@ class Invoice(SQLModel, table=True):
     amount: float
     status: InvoiceStatus = Field(default=InvoiceStatus.DRAFT)
     due_date: datetime
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     client_id: int = Field(foreign_key="client.id")
     

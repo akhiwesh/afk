@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
+from backend.app.core.time import utcnow
 
 class Workflow(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -8,7 +9,7 @@ class Workflow(SQLModel, table=True):
     description: Optional[str] = None
     steps_json: str  # Stores JSON structure of steps
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     organization_id: int = Field(foreign_key="organization.id")
     
@@ -21,7 +22,7 @@ class WorkflowExecutionLog(SQLModel, table=True):
     trigger_data: str  # JSON input details
     execution_steps: str  # JSON showing details of each step executed
     error_message: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     workflow_id: int = Field(foreign_key="workflow.id")
     

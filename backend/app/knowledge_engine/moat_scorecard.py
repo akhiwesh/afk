@@ -109,14 +109,16 @@ def _check_validation_discipline() -> dict:
     passed = (
         val is not None
         and corpus.get("protocol_id") == "AFK-VAL-0001"
-        and corpus.get("calibration_ready") is False
-        and corpus.get("cases_scored", 0) < 10
+        and corpus.get("calibration_ready") == (corpus.get("observed_cases_scored", 0) >= 10)
     )
     return {
         "pillar_id": "validation_discipline",
         "passed": passed,
         "evidence": {
             "cases_scored": corpus.get("cases_scored"),
+            "observed_cases_scored": corpus.get("observed_cases_scored"),
+            "synthetic_cases_scored": corpus.get("synthetic_cases_scored"),
+            "unclassified_cases_scored": corpus.get("unclassified_cases_scored"),
             "calibration_ready": corpus.get("calibration_ready"),
             "corpus_mean_agreement": corpus.get("corpus_mean_agreement"),
         },

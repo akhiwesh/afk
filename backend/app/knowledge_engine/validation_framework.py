@@ -46,13 +46,15 @@ def score_case_replay(case: dict) -> dict:
 
     return {
         "case_id": case.get("id"),
+        "synthetic": case.get("synthetic") is True,
+        "observed": case.get("synthetic") is False,
         "agreement_index": agreement_index,
         "checks": checks,
         "base_replay": base,
         "evidence_replay": with_evidence,
         "corpus_gate": {
             "minimum_cases": 10,
-            "current_note": "Agreement index is per-case only — corpus gate not evaluable until N≥10.",
+            "current_note": "Synthetic fixtures never count toward the N≥10 observed-case calibration gate.",
         },
         "protocol_id": "AFK-VAL-0001",
     }
@@ -61,19 +63,24 @@ def score_case_replay(case: dict) -> dict:
 def score_corpus(case_ids: list[str] | None = None) -> dict:
     """Score all or selected cases. Never reports fabricated corpus statistics."""
     r = load_registry()
-    ids = case_ids or [o["id"] for o in r.by_type("case_study")]
+    ids = dict.fromkeys(case_ids if case_ids is not None else [o["id"] for o in r.by_type("case_study")])
     results = []
     for cid in ids:
         case = r.get(cid)
         if case:
             results.append(score_case_replay(case))
 
-    indices = [x["agreement_index"] for x in results if x["agreement_index"] is not None]
+    observed = [x for x in results if x["observed"]]
+    synthetic = [x for x in results if x["synthetic"]]
+    indices = [x["agreement_index"] for x in observed if x["agreement_index"] is not None]
     return {
         "protocol_id": "AFK-VAL-0001",
         "cases_scored": len(results),
+        "observed_cases_scored": len(observed),
+        "synthetic_cases_scored": len(synthetic),
+        "unclassified_cases_scored": len(results) - len(observed) - len(synthetic),
         "per_case": results,
         "corpus_mean_agreement": round(sum(indices) / len(indices), 3) if indices else None,
-        "calibration_ready": len(results) >= 10,
-        "note": "corpus_mean_agreement is descriptive only until calibration_ready is true.",
+        "calibration_ready": len(observed) >= 10,
+        "note": "Only unique cases explicitly marked synthetic=false contribute to the corpus mean and N≥10 calibration gate; the mean is descriptive until calibration_ready is true.",
     }

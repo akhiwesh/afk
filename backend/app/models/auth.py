@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
+from backend.app.core.time import utcnow
 
 class UserRole(str, Enum):
     ADMIN = "admin"
@@ -11,7 +12,7 @@ class UserRole(str, Enum):
 class Organization(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     users: List["User"] = Relationship(back_populates="organization")
@@ -25,7 +26,7 @@ class User(SQLModel, table=True):
     hashed_password: str
     role: UserRole = Field(default=UserRole.TEAM)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id")
     

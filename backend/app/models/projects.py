@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
+from backend.app.core.time import utcnow
 
 class ProjectStatus(str, Enum):
     PLANNING = "planning"
@@ -26,7 +27,7 @@ class Project(SQLModel, table=True):
     description: Optional[str] = None
     status: ProjectStatus = Field(default=ProjectStatus.PLANNING)
     due_date: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     organization_id: int = Field(foreign_key="organization.id")
     
@@ -55,7 +56,7 @@ class Task(SQLModel, table=True):
     priority: TaskPriority = Field(default=TaskPriority.MEDIUM)
     column_index: int = Field(default=0) # For kanban positioning
     due_date: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     project_id: int = Field(foreign_key="project.id")
     assignee_id: Optional[int] = Field(default=None, foreign_key="user.id")
@@ -68,7 +69,7 @@ class Task(SQLModel, table=True):
 class TaskComment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     task_id: int = Field(foreign_key="task.id")
     user_id: int = Field(foreign_key="user.id")

@@ -33,7 +33,7 @@ scorecard:
     weight: 0.2
     pass: case contradictions array preserved in replay report
   minimum_cases_for_calibration: 10
-  current_corpus_size: 1
+  current_corpus_size: 0 # observed cases; two synthetic fixtures are excluded
 acceptance_criteria:
   hypothesis_elevation: AFK-CAS-* may move to observed only after scorecard ≥0.8 on primary_constraint across N≥10
   never: fabricate case outcomes or expert agreement percentages
@@ -42,7 +42,7 @@ relationships:
   target: AFK-PRI-0001
   confidence: hypothesized
 todos:
-- 'TODO(operations): ingest 9 more founder-approved cases before calibration pass/fail gate.'
+- 'TODO(operations): ingest 10 founder-approved observed cases before calibration pass/fail gate.'
 created:
   by: Chief Business Scientist (Infrastructure Mode)
   date: '2026-07-07'

@@ -37,7 +37,7 @@ def client_fixture(session: Session) -> Generator[TestClient, None, None]:
 def test_health_check(client: TestClient):
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "app": "AFK Growth Platform"}
+    assert response.json() == {"status": "ok", "app": "AFK Revenue Diagnostic"}
 
 def test_auth_registration_and_login(client: TestClient):
     # 1. Register User

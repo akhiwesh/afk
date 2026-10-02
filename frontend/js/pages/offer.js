@@ -32,6 +32,10 @@ const FAQ = [
     q: "Who is this not for?",
     a: "Pre-revenue startups, businesses without a repeatable offer, or teams looking for a CRM/automation suite. AFK diagnoses revenue constraints — it does not replace your ops stack.",
   },
+  {
+    q: "Is the method validated on businesses like mine?",
+    a: "AFK is an early-stage diagnostic. The sample business uses synthetic data, and the scoring rules are still hypotheses. A founder reviews each client diagnosis with you. We do not claim industry-calibrated benchmarks or guaranteed revenue growth.",
+  },
 ];
 
 function navHeader() {
@@ -160,7 +164,7 @@ export function renderOffer(container) {
         <section class="offer-section" id="deliverables">
           <div class="offer-section-head">
             <h2>What you walk away with</h2>
-            <p>Deliverables a consultant would charge ₹50k+ for — productized and evidence-grounded.</p>
+            <p>A diagnosis you can inspect, discuss, and act on with your team.</p>
           </div>
           <div class="offer-deliverables">
             <article class="offer-deliverable">
@@ -283,7 +287,7 @@ export function renderOffer(container) {
                 <ul>
                   <li>Guarantee revenue uplift from audit answers alone</li>
                   <li>Present AI prose as audited financial advice</li>
-                  <li>Hide when calibration data is insufficient (N&lt;8 cases)</li>
+                  <li>Claim calibrated accuracy before 10 observed cases</li>
                   <li>Sell you CRM or automation you don't need</li>
                 </ul>
               </div>
